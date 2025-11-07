@@ -17,7 +17,6 @@
 #:set adaptive_font lambda x: dp(x * text_scale)
 #:set adaptive_padding lambda x: dp(x * padding_scale)
 
-
 #: set PRIMARY_PINK (0.95, 0.3, 0.5, 1)    # Яскравий рожевий
 #: set LIGHT_PINK (1, 0.95, 0.95, 1)       # Світло-рожевий  
 #: set PRIMARY_BLUE (0.2, 0.7, 0.9, 1)     # Яскравий блакитний
@@ -26,6 +25,7 @@
 #: set ERROR_RED (0.9, 0.2, 0.2, 1) 
 #: set CREATION_BUTTON (0.95, 0.3, 0.5, 1)  # Рожевий для кнопки
 #: set SELECTED_ITEM_COLOR (0.85, 0.95, 1.0, 1) # Виділення
+#: set WHITE_BG (1, 1, 1, 1)               # Білий фон для модальних вікон
 
 
 <GradientBox@BoxLayout>:
@@ -569,306 +569,191 @@
     name: 'savings_tab'
     selected_plan_id: 0
     
+    canvas.before:
+        Color:
+            rgba: LIGHT_BLUE
+        Rectangle:
+            pos: self.pos
+            size: self.size
+    
     BoxLayout:
         orientation: 'vertical'
-        padding: dp(20)
-        spacing: dp(20)
+        padding: adaptive_padding(20)
+        spacing: adaptive_dp(20)
         
-        canvas.before:
-            Color:
-                rgba: 1, 1, 1, 1
-            Rectangle:
-                pos: self.pos
-                size: self.size
-
         # 1. БЛОК СТВОРЕННЯ НОВОГО ПЛАНУ
-        BoxLayout:
+        GradientBox:
+            color1: LIGHT_PINK
             orientation: 'vertical'
-            size_hint_y: None
-            height: dp(200)
-            spacing: dp(15)
-            padding: dp(15)
-            
-            canvas.before:
-                Color:
-                    rgba: LIGHT_PINK
-                RoundedRectangle:
-                    pos: self.pos
-                    size: self.size
-                    radius: [dp(20),]
+            padding: adaptive_padding(15)
+            spacing: adaptive_dp(15)
             
             Label:
                 text: 'Створити Новий План Заощаджень'
-                font_size: dp(18)
+                font_size: adaptive_font(18)
                 color: PRIMARY_PINK
                 size_hint_y: None
-                height: dp(30)
+                height: adaptive_dp(30)
                 bold: True
 
-            GridLayout:
-                cols: 3
-                spacing: dp(10)
+            BoxLayout:
+                orientation: 'horizontal'
+                spacing: adaptive_dp(10)
                 size_hint_y: None
-                height: dp(45)
+                height: adaptive_dp(55) if not is_small_screen else adaptive_dp(45)
                 
-                TextInput:
+                StyledTextInput:
                     id: plan_name_input
                     hint_text: 'Назва плану...'
-                    multiline: False
                     size_hint_x: 0.35
-                    height: dp(45)
-                    background_color: 1, 1, 1, 1
-                    foreground_color: 0.1, 0.1, 0.1, 1
-                    padding: [dp(10), dp(13)]
-                    
-                TextInput:
+                
+                StyledTextInput:
                     id: target_amount_input
                     hint_text: 'Цільова сума ($)'
                     input_filter: 'float'
-                    multiline: False
                     size_hint_x: 0.3
-                    height: dp(45)
-                    background_color: 1, 1, 1, 1
-                    foreground_color: 0.1, 0.1, 0.1, 1
-                    padding: [dp(10), dp(13)]
                 
                 BoxLayout:
+                    orientation: 'horizontal'
+                    spacing: adaptive_dp(5)
                     size_hint_x: 0.35
-                    spacing: dp(5)
-                    TextInput:
+                    
+                    StyledTextInput:
                         id: deadline_input
                         hint_text: 'Дедлайн'
-                        multiline: False
                         size_hint_x: 0.7
-                        height: dp(45)
-                        background_color: 1, 1, 1, 1
-                        foreground_color: 0.1, 0.1, 0.1, 1
-                        padding: [dp(10), dp(13)]
-                    Button:
+                    
+                    StyledButton:
                         size_hint_x: 0.3
                         background_color: PRIMARY_BLUE
                         on_press: root.show_calendar()
-                        canvas.before:
-                            Color:
-                                rgba: self.background_color
-                            RoundedRectangle:
-                                pos: self.pos
-                                size: self.size
-                                radius: [dp(10),]
+                        padding: adaptive_dp(5)
                         Image:
                             source: "icons/calendar.png"
                             size_hint: None, None
-                            size: dp(22), dp(22)
+                            size: adaptive_dp(22), adaptive_dp(22)
                             pos_hint: {'center_x': 0.5, 'center_y': 0.5}
 
-            Button:
-                size_hint_y: None
-                height: dp(50)
+            StyledButton:
+                text: "Створити План"
                 background_color: PRIMARY_PINK
+                size_hint_y: None
+                height: adaptive_dp(50)
                 on_press: root.create_savings_plan()
-                canvas.before:
-                    Color:
-                        rgba: self.background_color
-                    RoundedRectangle:
-                        pos: self.pos
-                        size: self.size
-                        radius: [dp(15),]
-                BoxLayout:
-                    size: self.parent.size
-                    pos: self.parent.pos
-                    spacing: dp(10)
-                    padding: [dp(15), 0]
-                    Image:
-                        source: "icons/rocket.png"
-                        size_hint: None, None
-                        size: dp(24), dp(24)
-                        pos_hint: {'center_y': 0.5}
-                    Label:
-                        text: "Створити План"
-                        color: 1, 1, 1, 1
-                        font_size: dp(16)
-                        bold: True
+                Image:
+                    source: "icons/rocket.png"
+                    size_hint: None, None
+                    size: adaptive_dp(24), adaptive_dp(24)
+                    pos_hint: {'center_x': 0.2, 'center_y': 0.5}
 
         # Повідомлення про статус
         Label:
             id: savings_message
             text: 'Введіть дані та створіть план'
             size_hint_y: None
-            height: dp(30)
+            height: adaptive_dp(30)
             color: PRIMARY_PINK
-            text_size: self.size
+            text_size: self.width, None
             halign: 'center'
             valign: 'middle'
-            font_size: dp(14)
+            font_size: adaptive_font(14)
 
         # 2. БЛОК ОПЕРАЦІЙ З ОБРАНИМ ПЛАНОМ
-        BoxLayout:
+        GradientBox:
+            color1: LIGHT_BLUE
             orientation: 'vertical'
-            size_hint_y: None
-            height: dp(160)
-            padding: dp(20)
-            spacing: dp(15)
+            padding: adaptive_padding(20)
+            spacing: adaptive_dp(15)
             
-            canvas.before:
-                Color:
-                    rgba: LIGHT_BLUE
-                RoundedRectangle:
-                    pos: self.pos
-                    size: self.size
-                    radius: [dp(20),]
-                    
             Label:
                 id: selected_plan_label
                 text: f'Обрано: {root.selected_plan_name}' if root.selected_plan_id > 0 else 'Оберіть план для операцій'
                 color: PRIMARY_BLUE if root.selected_plan_id > 0 else (0.5, 0.5, 0.5, 1)
-                font_size: dp(15)
+                font_size: adaptive_font(15)
                 size_hint_y: None
-                height: dp(25)
+                height: adaptive_dp(25)
                 bold: True if root.selected_plan_id > 0 else False
             
             BoxLayout:
+                orientation: 'horizontal'
+                spacing: adaptive_dp(10)
                 size_hint_y: None
-                height: dp(50)
-                spacing: dp(10)
+                height: adaptive_dp(55) if not is_small_screen else adaptive_dp(45)
                 
-                TextInput:
+                StyledTextInput:
                     id: savings_amount_input
                     hint_text: 'Сума ($)'
                     input_filter: 'float'
-                    multiline: False
                     size_hint_x: 0.4
-                    height: dp(50)
-                    background_color: 1, 1, 1, 1
-                    foreground_color: 0.1, 0.1, 0.1, 1
-                    padding: [dp(10), dp(15)]
                 
-                Button:
+                StyledButton:
                     id: add_funds_btn
+                    text: "Додати"
                     background_color: PRIMARY_PINK
                     size_hint_x: 0.3
                     disabled: root.selected_plan_id == 0
                     on_press: root.add_to_savings_plan()
-                    canvas.before:
-                        Color:
-                            rgba: self.background_color
-                        RoundedRectangle:
-                            pos: self.pos
-                            size: self.size
-                            radius: [dp(12),]
-                    BoxLayout:
-                        size: self.parent.size
-                        pos: self.parent.pos
-                        spacing: dp(5)
-                        Image:
-                            source: "icons/plus.png"
-                            size_hint: None, None
-                            size: dp(20), dp(20)
-                            pos_hint: {'center_y': 0.5}
-                        Label:
-                            text: "Додати"
-                            color: 1, 1, 1, 1
-                            font_size: dp(14)
-                            bold: True
+                    Image:
+                        source: "icons/plus.png"
+                        size_hint: None, None
+                        size: adaptive_dp(20), adaptive_dp(20)
+                        pos_hint: {'center_x': 0.2, 'center_y': 0.5}
                 
-                Button:
+                StyledButton:
                     id: withdraw_funds_btn
+                    text: "Вилучити"
                     background_color: PRIMARY_BLUE
                     size_hint_x: 0.3
                     disabled: root.selected_plan_id == 0
                     on_press: root.remove_from_savings_plan()
-                    canvas.before:
-                        Color:
-                            rgba: self.background_color
-                        RoundedRectangle:
-                            pos: self.pos
-                            size: self.size
-                            radius: [dp(12),]
-                    BoxLayout:
-                        size: self.parent.size
-                        pos: self.parent.pos
-                        spacing: dp(5)
-                        Image:
-                            source: "icons/minus.png"
-                            size_hint: None, None
-                            size: dp(20), dp(20)
-                            pos_hint: {'center_y': 0.5}
-                        Label:
-                            text: "Вилучити"
-                            color: 1, 1, 1, 1
-                            font_size: dp(14)
-                            bold: True
+                    Image:
+                        source: "icons/minus.png"
+                        size_hint: None, None
+                        size: adaptive_dp(20), adaptive_dp(20)
+                        pos_hint: {'center_x': 0.2, 'center_y': 0.5}
             
             BoxLayout:
+                orientation: 'horizontal'
+                spacing: adaptive_dp(10)
                 size_hint_y: None
-                height: dp(45)
-                spacing: dp(10)
+                height: adaptive_dp(50)
                 
-                Button:
+                StyledButton:
                     id: edit_plan_btn
+                    text: "Редагувати"
                     background_color: PRIMARY_BLUE
                     disabled: root.selected_plan_id == 0
                     on_press: root.edit_savings_plan()
-                    canvas.before:
-                        Color:
-                            rgba: self.background_color
-                        RoundedRectangle:
-                            pos: self.pos
-                            size: self.size
-                            radius: [dp(12),]
-                    BoxLayout:
-                        size: self.parent.size
-                        pos: self.parent.pos
-                        spacing: dp(5)
-                        Image:
-                            source: "icons/edit.png"
-                            size_hint: None, None
-                            size: dp(20), dp(20)
-                            pos_hint: {'center_y': 0.5}
-                        Label:
-                            text: "Редагувати"
-                            color: 1, 1, 1, 1
-                            font_size: dp(14)
-                            bold: True
+                    Image:
+                        source: "icons/edit.png"
+                        size_hint: None, None
+                        size: adaptive_dp(20), adaptive_dp(20)
+                        pos_hint: {'center_x': 0.2, 'center_y': 0.5}
                         
-                Button:
+                StyledButton:
                     id: delete_plan_btn
+                    text: "Видалити"
                     background_color: ERROR_RED
                     disabled: root.selected_plan_id == 0
                     on_press: root.delete_savings_plan()
-                    canvas.before:
-                        Color:
-                            rgba: self.background_color
-                        RoundedRectangle:
-                            pos: self.pos
-                            size: self.size
-                            radius: [dp(12),]
-                    BoxLayout:
-                        size: self.parent.size
-                        pos: self.parent.pos
-                        spacing: dp(5)
-                        Image:
-                            source: "icons/delete.png"
-                            size_hint: None, None
-                            size: dp(20), dp(20)
-                            pos_hint: {'center_y': 0.5}
-                        Label:
-                            text: "Видалити"
-                            color: 1, 1, 1, 1
-                            font_size: dp(14)
-                            bold: True
+                    Image:
+                        source: "icons/delete.png"
+                        size_hint: None, None
+                        size: adaptive_dp(20), adaptive_dp(20)
+                        pos_hint: {'center_x': 0.2, 'center_y': 0.5}
 
         # 3. БЛОК ВАШИХ АКТИВНИХ ПЛАНІВ
         Label:
             text: 'Ваші Цілі та Прогрес'
-            font_size: dp(18)
+            font_size: adaptive_font(18)
             color: PRIMARY_PINK
             size_hint_y: None
-            height: dp(35)
+            height: adaptive_dp(35)
             bold: True
 
         ScrollView:
             size_hint_y: 1
-            bar_width: dp(8)
+            bar_width: adaptive_dp(8)
             bar_color: PRIMARY_BLUE
             bar_inactive_color: PRIMARY_BLUE
             
@@ -877,8 +762,8 @@
                 cols: 1
                 size_hint_y: None
                 height: self.minimum_height
-                spacing: dp(12)
-                padding: dp(5)
+                spacing: adaptive_dp(12)
+                padding: adaptive_dp(5)
 
         
 <AITab>:
