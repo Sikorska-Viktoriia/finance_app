@@ -153,84 +153,89 @@
         size: adaptive_dp(35), adaptive_dp(35) if not is_small_screen else (adaptive_dp(28), adaptive_dp(28))
         pos_hint: {'center_x': 0.5}
 
+
 <SavingsPlanItem>:
-    is_selected: False # Прив'язка до BooleanProperty у Python
+    is_selected: False
     
-    # Висота елемента
     size_hint_y: None
     height: dp(80) 
     padding: dp(10)
     
-    # Стиль блоку (тінь/заокруглення)
     canvas.before:
         Color:
-            # === ВИПРАВЛЕННЯ: Використовуємо is_selected, щоб уникнути помилки 173 ===
             rgba: SELECTED_ITEM_COLOR if root.is_selected else (0.98, 0.98, 0.98, 1)
         Rectangle:
             pos: self.pos
             size: self.size
-        # Невелика рамка
         Color:
             rgba: DARK_BURGUNDY[0], DARK_BURGUNDY[1], DARK_BURGUNDY[2], 0.3
         Line:
             width: 1.5
             rectangle: self.x, self.y, self.width, self.height
             
-    # Обробник кліку для вибору плану
     on_touch_down:
         if self.collide_point(*args[1].pos): root.on_plan_select(root.plan_id, root.plan_name)
     
     BoxLayout:
-        orientation: 'vertical'
-        padding: dp(5)
-        spacing: dp(3)
+        orientation: 'horizontal'
+        spacing: dp(10)
         
-        # Верхній рядок: Назва та Суми
+        # Іконка плану
+        Image:
+            source: "icons/piggy_bank.png"
+            size_hint: None, None
+            size: dp(40), dp(40)
+            pos_hint: {'center_y': 0.5}
+        
         BoxLayout:
-            size_hint_y: None
-            height: dp(25)
+            orientation: 'vertical'
+            padding: dp(5)
+            spacing: dp(3)
             
-            Label:
-                text: root.plan_name
-                font_size: dp(16)
-                color: DARK_BURGUNDY
-                halign: 'left'
-                text_size: self.size
-                size_hint_x: 0.6
-                bold: True
-            
-            Label:
-                text: f"${root.current_amount:.2f} / ${root.target_amount:.2f}"
-                font_size: dp(14)
-                color: DARK_BURGUNDY
-                halign: 'right'
-                text_size: self.size
-                size_hint_x: 0.4
+            BoxLayout:
+                size_hint_y: None
+                height: dp(25)
                 
-        # Середній рядок: Прогрес-бар та Відсотки
-        BoxLayout:
-            size_hint_y: None
-            height: dp(15)
-            spacing: dp(5)
-            
-            ProgressBar:
-                value: root.progress
-                max: 100
-                size_hint_x: 0.7
-                background_color: 0.9, 0.9, 0.9, 1
-                foreground_color: TURQUOISE
+                Label:
+                    text: root.plan_name
+                    font_size: dp(16)
+                    color: DARK_BURGUNDY
+                    halign: 'left'
+                    text_size: self.size
+                    size_hint_x: 0.6
+                    bold: True
                 
-            Label:
-                text: f"{root.progress:.0f}%"
-                font_size: dp(12)
-                color: DARK_BURGUNDY
-                size_hint_x: 0.15
-            
-            Label:
-                text: f"{root.days_left} дн." if root.days_left > 0 else "∞"
-                font_size: dp(12)
-                color: TURQUOISE if root.days_left > 30 else ERROR_RED
-                size_hint_x: 0.15
+                Label:
+                    text: f"${root.current_amount:.2f} / ${root.target_amount:.2f}"
+                    font_size: dp(14)
+                    color: DARK_BURGUNDY
+                    halign: 'right'
+                    text_size: self.size
+                    size_hint_x: 0.4
+                    
+            BoxLayout:
+                size_hint_y: None
+                height: dp(15)
+                spacing: dp(5)
+                
+                ProgressBar:
+                    value: root.progress
+                    max: 100
+                    size_hint_x: 0.7
+                    background_color: 0.9, 0.9, 0.9, 1
+                    foreground_color: TURQUOISE
+                    
+                Label:
+                    text: f"{root.progress:.0f}%"
+                    font_size: dp(12)
+                    color: DARK_BURGUNDY
+                    size_hint_x: 0.15
+                
+                Label:
+                    text: f"{root.days_left} дн." if root.days_left > 0 else "∞"
+                    font_size: dp(12)
+                    color: TURQUOISE if root.days_left > 30 else ERROR_RED
+                    size_hint_x: 0.15
 
 <StartScreen>:
     name: 'start_screen'
@@ -552,14 +557,13 @@
 
 <SavingsTab>:
     name: 'savings_tab'
-    selected_plan_id: 0 # Переконайтеся, що ця властивість є у вашому Python класі SavingsTab!
+    selected_plan_id: 0
     
     BoxLayout:
         orientation: 'vertical'
         padding: dp(15)
         spacing: dp(15)
         
-        # Загальний фон (білий)
         canvas.before:
             Color:
                 rgba: 1, 1, 1, 1
@@ -575,13 +579,12 @@
             spacing: dp(10)
             
             Label:
-                text: '✨ Створити Новий План Заощаджень'
+                text: 'Створити Новий План Заощаджень'
                 font_size: dp(18)
                 color: DARK_BURGUNDY
                 size_hint_y: None
                 height: dp(30)
 
-            # Поля вводу
             GridLayout:
                 cols: 3
                 spacing: dp(10)
@@ -613,23 +616,36 @@
                         size_hint_x: 0.7
                         height: dp(40)
                     Button:
-                        text: '📅'
                         size_hint_x: 0.3
                         background_color: TURQUOISE
                         on_press: root.show_calendar()
+                        Image:
+                            source: "icons/calendar.png"
+                            size_hint: None, None
+                            size: dp(20), dp(20)
+                            pos_hint: {'center_x': 0.5, 'center_y': 0.5}
 
-            # Кнопка Створити
             Button:
-                text: '🚀 Створити План'
                 size_hint_y: None
                 height: dp(45)
                 background_color: CREATION_BUTTON
                 on_press: root.create_savings_plan()
+                BoxLayout:
+                    size: self.parent.size
+                    pos: self.parent.pos
+                    Image:
+                        source: "icons/rocket.png"
+                        size_hint: None, None
+                        size: dp(20), dp(20)
+                        pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+                    Label:
+                        text: "Створити План"
+                        color: 1, 1, 1, 1
+                        font_size: dp(14)
 
-        # Повідомлення про статус
         Label:
             id: savings_message
-            text: '🎯 Введіть дані та створіть план'
+            text: 'Введіть дані та створіть план'
             size_hint_y: None
             height: dp(25)
             color: DARK_BURGUNDY
@@ -637,7 +653,6 @@
             halign: 'center'
             valign: 'middle'
         
-        # Візуальний роздільник
         Widget:
             size_hint_y: None
             height: dp(1)
@@ -656,7 +671,6 @@
             padding: dp(10)
             spacing: dp(10)
             
-            # Фон блоку операцій (світло-рожевий)
             canvas.before:
                 Color:
                     rgba: LIGHT_PINK[0], LIGHT_PINK[1], LIGHT_PINK[2], 0.7 
@@ -666,13 +680,12 @@
                     
             Label:
                 id: selected_plan_label
-                text: f'✅ Обрано: {root.selected_plan_name}' if root.selected_plan_id > 0 else '👆 Оберіть план для операцій'
+                text: f'Обрано: {root.selected_plan_name}' if root.selected_plan_id > 0 else 'Оберіть план для операцій'
                 color: DARK_BURGUNDY if root.selected_plan_id > 0 else (0.5, 0.5, 0.5, 1)
                 font_size: dp(14)
                 size_hint_y: None
                 height: dp(20)
             
-            # Поле вводу суми та основні кнопки
             BoxLayout:
                 size_hint_y: None
                 height: dp(40)
@@ -688,21 +701,42 @@
                 
                 Button:
                     id: add_funds_btn
-                    text: '+ Додати'
                     background_color: CREATION_BUTTON[0], CREATION_BUTTON[1]*0.8, CREATION_BUTTON[2]*0.8, 1
                     size_hint_x: 0.3
                     disabled: root.selected_plan_id == 0
                     on_press: root.add_to_savings_plan()
+                    BoxLayout:
+                        size: self.parent.size
+                        pos: self.parent.pos
+                        Image:
+                            source: "icons/plus.png"
+                            size_hint: None, None
+                            size: dp(16), dp(16)
+                            pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+                        Label:
+                            text: "Додати"
+                            color: 1, 1, 1, 1
+                            font_size: dp(12)
                 
                 Button:
                     id: withdraw_funds_btn
-                    text: '- Вилучити'
                     background_color: (0.6, 0.6, 0.6, 1)
                     size_hint_x: 0.3
                     disabled: root.selected_plan_id == 0
                     on_press: root.remove_from_savings_plan()
+                    BoxLayout:
+                        size: self.parent.size
+                        pos: self.parent.pos
+                        Image:
+                            source: "icons/minus.png"
+                            size_hint: None, None
+                            size: dp(16), dp(16)
+                            pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+                        Label:
+                            text: "Вилучити"
+                            color: 1, 1, 1, 1
+                            font_size: dp(12)
             
-            # Кнопки редагування/видалення
             BoxLayout:
                 size_hint_y: None
                 height: dp(40)
@@ -710,21 +744,43 @@
                 
                 Button:
                     id: edit_plan_btn
-                    text: '✏️ Редагувати'
                     background_color: TURQUOISE
                     disabled: root.selected_plan_id == 0
                     on_press: root.edit_savings_plan()
-                    
+                    BoxLayout:
+                        size: self.parent.size
+                        pos: self.parent.pos
+                        Image:
+                            source: "icons/edit.png"
+                            size_hint: None, None
+                            size: dp(16), dp(16)
+                            pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+                        Label:
+                            text: "Редагувати"
+                            color: 1, 1, 1, 1
+                            font_size: dp(12)
+                        
                 Button:
                     id: delete_plan_btn
-                    text: '🗑️ Видалити'
                     background_color: ERROR_RED
                     disabled: root.selected_plan_id == 0
                     on_press: root.delete_savings_plan()
+                    BoxLayout:
+                        size: self.parent.size
+                        pos: self.parent.pos
+                        Image:
+                            source: "icons/delete.png"
+                            size_hint: None, None
+                            size: dp(16), dp(16)
+                            pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+                        Label:
+                            text: "Видалити"
+                            color: 1, 1, 1, 1
+                            font_size: dp(12)
 
         # 3. БЛОК ВАШИХ АКТИВНИХ ПЛАНІВ (СПИСОК)
         Label:
-            text: '💰 Ваші Цілі та Прогрес'
+            text: 'Ваші Цілі та Прогрес'
             font_size: dp(18)
             color: DARK_BURGUNDY
             size_hint_y: None
