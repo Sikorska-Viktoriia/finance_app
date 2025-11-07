@@ -18,13 +18,15 @@
 #:set adaptive_padding lambda x: dp(x * padding_scale)
 
 
-#: set DARK_BURGUNDY (0.5, 0.1, 0.2, 1) 
-#: set LIGHT_PINK (1, 0.9, 0.95, 1)    
-#: set TURQUOISE (0.14, 0.76, 0.88, 1) 
-#: set SUCCESS_GREEN (0.2, 0.6, 0.2, 1)
-#: set ERROR_RED (0.8, 0.2, 0.2, 1) 
-#: set CREATION_BUTTON (0.8, 0.4, 0.45, 1) # Рожево-червоний для кнопки Створити
-#: set SELECTED_ITEM_COLOR (0.8, 0.95, 0.95, 1) # Дуже світло-бірюзовий для виділення
+#: set PRIMARY_PINK (0.95, 0.3, 0.5, 1)    # Яскравий рожевий
+#: set LIGHT_PINK (1, 0.95, 0.95, 1)       # Світло-рожевий  
+#: set PRIMARY_BLUE (0.2, 0.7, 0.9, 1)     # Яскравий блакитний
+#: set LIGHT_BLUE (0.92, 0.98, 1.0, 1)     # Світло-блакитний
+#: set SUCCESS_GREEN (0.2, 0.8, 0.3, 1)
+#: set ERROR_RED (0.9, 0.2, 0.2, 1) 
+#: set CREATION_BUTTON (0.95, 0.3, 0.5, 1)  # Рожевий для кнопки
+#: set SELECTED_ITEM_COLOR (0.85, 0.95, 1.0, 1) # Виділення
+
 
 <GradientBox@BoxLayout>:
     color1: 1, 1, 1, 1
@@ -156,50 +158,53 @@
 
 <SavingsPlanItem>:
     is_selected: False
+    plan_id: 0 
+    plan_name: "" 
+    current_amount: 0.0
+    target_amount: 0.0
+    progress: 0
+    days_left: 0
     
     size_hint_y: None
-    height: dp(80) 
-    padding: dp(10)
+    height: dp(90) 
+    padding: dp(15)
     
     canvas.before:
         Color:
-            rgba: SELECTED_ITEM_COLOR if root.is_selected else (0.98, 0.98, 0.98, 1)
-        Rectangle:
+            rgba: SELECTED_ITEM_COLOR if root.is_selected else LIGHT_PINK
+        RoundedRectangle:
             pos: self.pos
             size: self.size
+            radius: [dp(15),]
         Color:
-            rgba: DARK_BURGUNDY[0], DARK_BURGUNDY[1], DARK_BURGUNDY[2], 0.3
+            rgba: PRIMARY_PINK if root.is_selected else (0.7, 0.7, 0.7, 1)
         Line:
-            width: 1.5
-            rectangle: self.x, self.y, self.width, self.height
+            rounded_rectangle: [self.x, self.y, self.width, self.height, dp(15)]
+            width: 2.5 if root.is_selected else 1
             
-    on_touch_down:
-        if self.collide_point(*args[1].pos): root.on_plan_select(root.plan_id, root.plan_name)
-    
     BoxLayout:
         orientation: 'horizontal'
-        spacing: dp(10)
+        spacing: dp(12)
         
-        # Іконка плану
         Image:
             source: "icons/piggy_bank.png"
             size_hint: None, None
-            size: dp(40), dp(40)
+            size: dp(45), dp(45)
             pos_hint: {'center_y': 0.5}
         
         BoxLayout:
             orientation: 'vertical'
-            padding: dp(5)
-            spacing: dp(3)
+            padding: dp(2)
+            spacing: dp(5)
             
             BoxLayout:
                 size_hint_y: None
-                height: dp(25)
+                height: dp(30)
                 
                 Label:
                     text: root.plan_name
                     font_size: dp(16)
-                    color: DARK_BURGUNDY
+                    color: PRIMARY_PINK
                     halign: 'left'
                     text_size: self.size
                     size_hint_x: 0.6
@@ -208,40 +213,43 @@
                 Label:
                     text: f"${root.current_amount:.2f} / ${root.target_amount:.2f}"
                     font_size: dp(14)
-                    color: DARK_BURGUNDY
+                    color: PRIMARY_BLUE
                     halign: 'right'
                     text_size: self.size
                     size_hint_x: 0.4
+                    bold: True
                     
             BoxLayout:
                 size_hint_y: None
-                height: dp(15)
-                spacing: dp(5)
+                height: dp(20)
+                spacing: dp(8)
                 
                 ProgressBar:
                     value: root.progress
                     max: 100
-                    size_hint_x: 0.7
+                    size_hint_x: 0.65
                     background_color: 0.9, 0.9, 0.9, 1
-                    foreground_color: TURQUOISE
+                    foreground_color: PRIMARY_BLUE
                     
                 Label:
                     text: f"{root.progress:.0f}%"
                     font_size: dp(12)
-                    color: DARK_BURGUNDY
+                    color: PRIMARY_PINK
                     size_hint_x: 0.15
+                    bold: True
                 
                 Label:
                     text: f"{root.days_left} дн." if root.days_left > 0 else "∞"
                     font_size: dp(12)
-                    color: TURQUOISE if root.days_left > 30 else ERROR_RED
-                    size_hint_x: 0.15
+                    color: PRIMARY_BLUE if root.days_left > 30 else ERROR_RED
+                    size_hint_x: 0.2
+                    bold: True
 
 <StartScreen>:
     name: 'start_screen'
     canvas.before:
         Color:
-            rgba: 0.14, 0.76, 0.88, 1
+            rgba: PRIMARY_BLUE
         Rectangle:
             pos: self.pos
             size: self.size
@@ -273,7 +281,7 @@
 
         StyledButton:
             text: "Login"
-            background_color: 1.0, 0.42, 0.42, 1
+            background_color: PRIMARY_PINK
             on_press:
                 root.manager.transition.direction = 'left'
                 root.manager.current = "login_screen"
@@ -281,7 +289,7 @@
         StyledButton:
             text: "Register"
             background_color: 1, 1, 1, 1
-            color: 1.0, 0.42, 0.42, 1
+            color: PRIMARY_PINK
             on_press:
                 root.manager.transition.direction = 'left'
                 root.manager.current = "registration_screen"
@@ -290,7 +298,7 @@
     name: "registration_screen"
     canvas.before:
         Color:
-            rgba: 0.9, 0.95, 1.0, 1
+            rgba: LIGHT_BLUE
         Rectangle:
             pos: self.pos
             size: self.size
@@ -307,7 +315,7 @@
             text: "Створити обліковий запис"
             font_size: adaptive_font(30) if not is_small_screen else adaptive_font(24)
             bold: True
-            color: 0.05, 0.05, 0.15, 1
+            color: PRIMARY_PINK
             size_hint_y: None
             height: adaptive_dp(40)
 
@@ -335,7 +343,7 @@
 
         StyledButton:
             text: "Зареєструватися"
-            background_color: 1.0, 0.42, 0.42, 1
+            background_color: PRIMARY_PINK
             size_hint_y: None
             height: adaptive_dp(60) if not is_small_screen else adaptive_dp(50)
             on_press: root.register_user()
@@ -343,7 +351,7 @@
         Label:
             id: reg_message
             text: ""
-            color: 0.8, 0, 0, 1
+            color: ERROR_RED
             size_hint_y: None
             height: adaptive_dp(30)
 
@@ -357,7 +365,7 @@
             StyledButton:
                 text: "Увійти"
                 background_color: 0.8, 0.8, 0.8, 0
-                color: 0.14, 0.76, 0.88, 1
+                color: PRIMARY_BLUE
                 font_size: adaptive_font(16)
                 bold: True
                 size_hint_x: 0.5
@@ -369,7 +377,7 @@
     name: "login_screen"
     canvas.before:
         Color:
-            rgba: 0.9, 0.95, 1.0, 1
+            rgba: LIGHT_BLUE
         Rectangle:
             pos: self.pos
             size: self.size
@@ -386,7 +394,7 @@
             text: "Вхід до системи"
             font_size: adaptive_font(34) if not is_small_screen else adaptive_font(28)
             bold: True
-            color: 0.05, 0.05, 0.15, 1
+            color: PRIMARY_PINK
             size_hint_y: None
             height: adaptive_dp(50)
         
@@ -406,7 +414,7 @@
 
         StyledButton:
             text: "Увійти"
-            background_color: 0.14, 0.76, 0.88, 1
+            background_color: PRIMARY_BLUE
             size_hint_y: None
             height: adaptive_dp(60) if not is_small_screen else adaptive_dp(50)
             on_press: root.login_user()
@@ -414,7 +422,7 @@
         Label:
             id: login_message
             text: ""
-            color: 0.8, 0, 0, 1
+            color: ERROR_RED
             size_hint_y: None
             height: adaptive_dp(30)
 
@@ -431,7 +439,7 @@
             StyledButton:
                 text: "Зареєструватися"
                 background_color: 0.8, 0.8, 0.8, 0
-                color: 1.0, 0.42, 0.42, 1
+                color: PRIMARY_PINK
                 font_size: adaptive_font(16)
                 bold: True
                 size_hint_x: 0.5
@@ -443,7 +451,7 @@
     name: "home_tab"
     canvas.before:
         Color:
-            rgba: 0.95, 0.98, 1.0, 1
+            rgba: LIGHT_BLUE
         Rectangle:
             pos: self.pos
             size: self.size
@@ -467,7 +475,7 @@
                 text: "Welcome!"
                 font_size: adaptive_font(28) if not is_small_screen else adaptive_font(24)
                 bold: True
-                color: 0.05, 0.05, 0.15, 1
+                color: PRIMARY_PINK
                 size_hint_y: None
                 height: adaptive_dp(40)
 
@@ -475,7 +483,7 @@
                 id: balance_label
                 text: "Balance: $0"
                 font_size: adaptive_font(24) if not is_small_screen else adaptive_font(20)
-                color: 0.05, 0.05, 0.15, 1
+                color: PRIMARY_BLUE
                 size_hint_y: None
                 height: adaptive_dp(35)
 
@@ -491,13 +499,13 @@
 
                 StyledButton:
                     text: "Add"
-                    background_color: 1.0, 0.42, 0.42, 1
+                    background_color: PRIMARY_PINK
                     size_hint_x: 0.4
                     on_press: root.add_money()
 
                 StyledButton:
                     text: "Remove"
-                    background_color: 0.14, 0.76, 0.88, 1
+                    background_color: PRIMARY_BLUE
                     size_hint_x: 0.4
                     on_press: root.remove_money()
 
@@ -505,7 +513,7 @@
             text: "Transaction History"
             font_size: adaptive_font(20) if not is_small_screen else adaptive_font(18)
             bold: True
-            color: 0.05, 0.05, 0.15, 1
+            color: PRIMARY_PINK
             size_hint_y: None
             height: adaptive_dp(35)
 
@@ -513,7 +521,7 @@
             size_hint_y: 1
             do_scroll_x: False
             bar_width: adaptive_dp(8)
-            bar_color: 0.14, 0.76, 0.88, 0.7
+            bar_color: PRIMARY_BLUE
             
             BoxLayout:
                 id: history_container
@@ -527,7 +535,7 @@
     name: "analytics_tab"
     canvas.before:
         Color:
-            rgba: 0.95, 0.98, 1.0, 1
+            rgba: LIGHT_BLUE
         Rectangle:
             pos: self.pos
             size: self.size
@@ -541,19 +549,21 @@
             height: adaptive_dp(120) if not is_small_screen else adaptive_dp(90)
         
         Label:
-            text: "📊 Analytics"
+            text: "Analytics"
             font_size: adaptive_font(28) if not is_small_screen else adaptive_font(24)
             bold: True
-            color: 0.05, 0.05, 0.15, 1
+            color: PRIMARY_PINK
             size_hint_y: None
             height: adaptive_dp(40)
         
         Label:
             text: "Transaction history and charts will appear here"
             font_size: adaptive_font(18) if not is_small_screen else adaptive_font(16)
-            color: 0.05, 0.05, 0.15, 0.8
+            color: PRIMARY_BLUE
             halign: "center"
             text_size: self.width, None
+
+
 
 <SavingsTab>:
     name: 'savings_tab'
@@ -561,8 +571,8 @@
     
     BoxLayout:
         orientation: 'vertical'
-        padding: dp(15)
-        spacing: dp(15)
+        padding: dp(20)
+        spacing: dp(20)
         
         canvas.before:
             Color:
@@ -575,36 +585,52 @@
         BoxLayout:
             orientation: 'vertical'
             size_hint_y: None
-            height: dp(180)
-            spacing: dp(10)
+            height: dp(200)
+            spacing: dp(15)
+            padding: dp(15)
+            
+            canvas.before:
+                Color:
+                    rgba: LIGHT_PINK
+                RoundedRectangle:
+                    pos: self.pos
+                    size: self.size
+                    radius: [dp(20),]
             
             Label:
                 text: 'Створити Новий План Заощаджень'
                 font_size: dp(18)
-                color: DARK_BURGUNDY
+                color: PRIMARY_PINK
                 size_hint_y: None
                 height: dp(30)
+                bold: True
 
             GridLayout:
                 cols: 3
                 spacing: dp(10)
                 size_hint_y: None
-                height: dp(40)
+                height: dp(45)
                 
                 TextInput:
                     id: plan_name_input
                     hint_text: 'Назва плану...'
                     multiline: False
                     size_hint_x: 0.35
-                    height: dp(40)
+                    height: dp(45)
+                    background_color: 1, 1, 1, 1
+                    foreground_color: 0.1, 0.1, 0.1, 1
+                    padding: [dp(10), dp(13)]
                     
                 TextInput:
                     id: target_amount_input
                     hint_text: 'Цільова сума ($)'
-                    input_type: 'number'
+                    input_filter: 'float'
                     multiline: False
                     size_hint_x: 0.3
-                    height: dp(40)
+                    height: dp(45)
+                    background_color: 1, 1, 1, 1
+                    foreground_color: 0.1, 0.1, 0.1, 1
+                    padding: [dp(10), dp(13)]
                 
                 BoxLayout:
                     size_hint_x: 0.35
@@ -614,194 +640,252 @@
                         hint_text: 'Дедлайн'
                         multiline: False
                         size_hint_x: 0.7
-                        height: dp(40)
+                        height: dp(45)
+                        background_color: 1, 1, 1, 1
+                        foreground_color: 0.1, 0.1, 0.1, 1
+                        padding: [dp(10), dp(13)]
                     Button:
                         size_hint_x: 0.3
-                        background_color: TURQUOISE
+                        background_color: PRIMARY_BLUE
                         on_press: root.show_calendar()
+                        canvas.before:
+                            Color:
+                                rgba: self.background_color
+                            RoundedRectangle:
+                                pos: self.pos
+                                size: self.size
+                                radius: [dp(10),]
                         Image:
                             source: "icons/calendar.png"
                             size_hint: None, None
-                            size: dp(20), dp(20)
+                            size: dp(22), dp(22)
                             pos_hint: {'center_x': 0.5, 'center_y': 0.5}
 
             Button:
                 size_hint_y: None
-                height: dp(45)
-                background_color: CREATION_BUTTON
+                height: dp(50)
+                background_color: PRIMARY_PINK
                 on_press: root.create_savings_plan()
+                canvas.before:
+                    Color:
+                        rgba: self.background_color
+                    RoundedRectangle:
+                        pos: self.pos
+                        size: self.size
+                        radius: [dp(15),]
                 BoxLayout:
                     size: self.parent.size
                     pos: self.parent.pos
+                    spacing: dp(10)
+                    padding: [dp(15), 0]
                     Image:
                         source: "icons/rocket.png"
                         size_hint: None, None
-                        size: dp(20), dp(20)
-                        pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+                        size: dp(24), dp(24)
+                        pos_hint: {'center_y': 0.5}
                     Label:
                         text: "Створити План"
                         color: 1, 1, 1, 1
-                        font_size: dp(14)
+                        font_size: dp(16)
+                        bold: True
 
+        # Повідомлення про статус
         Label:
             id: savings_message
             text: 'Введіть дані та створіть план'
             size_hint_y: None
-            height: dp(25)
-            color: DARK_BURGUNDY
+            height: dp(30)
+            color: PRIMARY_PINK
             text_size: self.size
             halign: 'center'
             valign: 'middle'
-        
-        Widget:
-            size_hint_y: None
-            height: dp(1)
-            canvas:
-                Color:
-                    rgba: DARK_BURGUNDY[0], DARK_BURGUNDY[1], DARK_BURGUNDY[2], 0.3
-                Rectangle:
-                    pos: self.pos
-                    size: self.size
+            font_size: dp(14)
 
         # 2. БЛОК ОПЕРАЦІЙ З ОБРАНИМ ПЛАНОМ
         BoxLayout:
             orientation: 'vertical'
             size_hint_y: None
-            height: dp(130)
-            padding: dp(10)
-            spacing: dp(10)
+            height: dp(160)
+            padding: dp(20)
+            spacing: dp(15)
             
             canvas.before:
                 Color:
-                    rgba: LIGHT_PINK[0], LIGHT_PINK[1], LIGHT_PINK[2], 0.7 
-                Rectangle:
+                    rgba: LIGHT_BLUE
+                RoundedRectangle:
                     pos: self.pos
                     size: self.size
+                    radius: [dp(20),]
                     
             Label:
                 id: selected_plan_label
                 text: f'Обрано: {root.selected_plan_name}' if root.selected_plan_id > 0 else 'Оберіть план для операцій'
-                color: DARK_BURGUNDY if root.selected_plan_id > 0 else (0.5, 0.5, 0.5, 1)
-                font_size: dp(14)
+                color: PRIMARY_BLUE if root.selected_plan_id > 0 else (0.5, 0.5, 0.5, 1)
+                font_size: dp(15)
                 size_hint_y: None
-                height: dp(20)
+                height: dp(25)
+                bold: True if root.selected_plan_id > 0 else False
             
             BoxLayout:
                 size_hint_y: None
-                height: dp(40)
+                height: dp(50)
                 spacing: dp(10)
                 
                 TextInput:
                     id: savings_amount_input
                     hint_text: 'Сума ($)'
-                    input_type: 'number'
+                    input_filter: 'float'
                     multiline: False
                     size_hint_x: 0.4
-                    height: dp(40)
+                    height: dp(50)
+                    background_color: 1, 1, 1, 1
+                    foreground_color: 0.1, 0.1, 0.1, 1
+                    padding: [dp(10), dp(15)]
                 
                 Button:
                     id: add_funds_btn
-                    background_color: CREATION_BUTTON[0], CREATION_BUTTON[1]*0.8, CREATION_BUTTON[2]*0.8, 1
+                    background_color: PRIMARY_PINK
                     size_hint_x: 0.3
                     disabled: root.selected_plan_id == 0
                     on_press: root.add_to_savings_plan()
+                    canvas.before:
+                        Color:
+                            rgba: self.background_color
+                        RoundedRectangle:
+                            pos: self.pos
+                            size: self.size
+                            radius: [dp(12),]
                     BoxLayout:
                         size: self.parent.size
                         pos: self.parent.pos
+                        spacing: dp(5)
                         Image:
                             source: "icons/plus.png"
                             size_hint: None, None
-                            size: dp(16), dp(16)
-                            pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+                            size: dp(20), dp(20)
+                            pos_hint: {'center_y': 0.5}
                         Label:
                             text: "Додати"
                             color: 1, 1, 1, 1
-                            font_size: dp(12)
+                            font_size: dp(14)
+                            bold: True
                 
                 Button:
                     id: withdraw_funds_btn
-                    background_color: (0.6, 0.6, 0.6, 1)
+                    background_color: PRIMARY_BLUE
                     size_hint_x: 0.3
                     disabled: root.selected_plan_id == 0
                     on_press: root.remove_from_savings_plan()
+                    canvas.before:
+                        Color:
+                            rgba: self.background_color
+                        RoundedRectangle:
+                            pos: self.pos
+                            size: self.size
+                            radius: [dp(12),]
                     BoxLayout:
                         size: self.parent.size
                         pos: self.parent.pos
+                        spacing: dp(5)
                         Image:
                             source: "icons/minus.png"
                             size_hint: None, None
-                            size: dp(16), dp(16)
-                            pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+                            size: dp(20), dp(20)
+                            pos_hint: {'center_y': 0.5}
                         Label:
                             text: "Вилучити"
                             color: 1, 1, 1, 1
-                            font_size: dp(12)
+                            font_size: dp(14)
+                            bold: True
             
             BoxLayout:
                 size_hint_y: None
-                height: dp(40)
+                height: dp(45)
                 spacing: dp(10)
                 
                 Button:
                     id: edit_plan_btn
-                    background_color: TURQUOISE
+                    background_color: PRIMARY_BLUE
                     disabled: root.selected_plan_id == 0
                     on_press: root.edit_savings_plan()
+                    canvas.before:
+                        Color:
+                            rgba: self.background_color
+                        RoundedRectangle:
+                            pos: self.pos
+                            size: self.size
+                            radius: [dp(12),]
                     BoxLayout:
                         size: self.parent.size
                         pos: self.parent.pos
+                        spacing: dp(5)
                         Image:
                             source: "icons/edit.png"
                             size_hint: None, None
-                            size: dp(16), dp(16)
-                            pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+                            size: dp(20), dp(20)
+                            pos_hint: {'center_y': 0.5}
                         Label:
                             text: "Редагувати"
                             color: 1, 1, 1, 1
-                            font_size: dp(12)
+                            font_size: dp(14)
+                            bold: True
                         
                 Button:
                     id: delete_plan_btn
                     background_color: ERROR_RED
                     disabled: root.selected_plan_id == 0
                     on_press: root.delete_savings_plan()
+                    canvas.before:
+                        Color:
+                            rgba: self.background_color
+                        RoundedRectangle:
+                            pos: self.pos
+                            size: self.size
+                            radius: [dp(12),]
                     BoxLayout:
                         size: self.parent.size
                         pos: self.parent.pos
+                        spacing: dp(5)
                         Image:
                             source: "icons/delete.png"
                             size_hint: None, None
-                            size: dp(16), dp(16)
-                            pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+                            size: dp(20), dp(20)
+                            pos_hint: {'center_y': 0.5}
                         Label:
                             text: "Видалити"
                             color: 1, 1, 1, 1
-                            font_size: dp(12)
+                            font_size: dp(14)
+                            bold: True
 
-        # 3. БЛОК ВАШИХ АКТИВНИХ ПЛАНІВ (СПИСОК)
+        # 3. БЛОК ВАШИХ АКТИВНИХ ПЛАНІВ
         Label:
             text: 'Ваші Цілі та Прогрес'
             font_size: dp(18)
-            color: DARK_BURGUNDY
+            color: PRIMARY_PINK
             size_hint_y: None
-            height: dp(30)
+            height: dp(35)
+            bold: True
 
         ScrollView:
             size_hint_y: 1
+            bar_width: dp(8)
+            bar_color: PRIMARY_BLUE
+            bar_inactive_color: PRIMARY_BLUE
             
             GridLayout:
                 id: savings_container
                 cols: 1
                 size_hint_y: None
                 height: self.minimum_height
-                spacing: dp(10)
+                spacing: dp(12)
                 padding: dp(5)
 
+        
 <AITab>:
     name: "ai_tab"
     canvas.before:
         Color:
-            rgba: 0.95, 0.98, 1.0, 1
+            rgba: LIGHT_BLUE
         Rectangle:
             pos: self.pos
             size: self.size
@@ -818,14 +902,14 @@
             text: "🤖 AI Assistant"
             font_size: adaptive_font(28) if not is_small_screen else adaptive_font(24)
             bold: True
-            color: 0.05, 0.05, 0.15, 1
+            color: PRIMARY_PINK
             size_hint_y: None
             height: adaptive_dp(40)
         
         Label:
             text: "Smart financial advice and predictions"
             font_size: adaptive_font(18) if not is_small_screen else adaptive_font(16)
-            color: 0.05, 0.05, 0.15, 0.8
+            color: PRIMARY_BLUE
             halign: "center"
             text_size: self.width, None
 
@@ -833,7 +917,7 @@
     name: "account_tab"
     canvas.before:
         Color:
-            rgba: 0.95, 0.98, 1.0, 1
+            rgba: LIGHT_BLUE
         Rectangle:
             pos: self.pos
             size: self.size
@@ -850,7 +934,7 @@
             text: "👤 Account Settings"
             font_size: adaptive_font(28) if not is_small_screen else adaptive_font(24)
             bold: True
-            color: 0.05, 0.05, 0.15, 1
+            color: PRIMARY_PINK
             size_hint_y: None
             height: adaptive_dp(40)
         
@@ -866,7 +950,7 @@
                 id: username_label
                 text: "Username: "
                 font_size: adaptive_font(18) if not is_small_screen else adaptive_font(16)
-                color: 0.05, 0.05, 0.15, 1
+                color: PRIMARY_PINK
                 size_hint_y: None
                 height: adaptive_dp(30)
             
@@ -874,7 +958,7 @@
                 id: email_label
                 text: "Email: "
                 font_size: adaptive_font(18) if not is_small_screen else adaptive_font(16)
-                color: 0.05, 0.05, 0.15, 1
+                color: PRIMARY_BLUE
                 size_hint_y: None
                 height: adaptive_dp(30)
             
@@ -882,7 +966,7 @@
             
             StyledButton:
                 text: "Logout"
-                background_color: 1.0, 0.42, 0.42, 1
+                background_color: PRIMARY_PINK
                 height: adaptive_dp(60) if not is_small_screen else adaptive_dp(50)
                 on_press: root.logout()
 
@@ -891,7 +975,7 @@
     name: "dashboard_screen"
     canvas.before:
         Color:
-            rgba: 0.95, 0.98, 1.0, 1
+            rgba: LIGHT_BLUE
         Rectangle:
             pos: self.pos
             size: self.size
@@ -903,7 +987,7 @@
             id: tab_manager
             canvas.before:
                 Color:
-                    rgba: 0.95, 0.98, 1.0, 1
+                    rgba: LIGHT_BLUE
                 Rectangle:
                     pos: self.pos
                     size: self.size
@@ -921,12 +1005,12 @@
             spacing: adaptive_dp(10)
             canvas.before:
                 Color:
-                    rgba: 0.14, 0.76, 0.88, 1
+                    rgba: PRIMARY_BLUE
                 RoundedRectangle:
                     pos: self.pos
                     size: self.size
                     radius: [adaptive_dp(25), adaptive_dp(25), 0, 0]
-# У кінці DashboardScreen в KV файлі
+
             BottomMenuItem:
                 tab_name: "home"
                 icon_source: "icons/home.png"

@@ -7,6 +7,7 @@ from kivy.properties import (
     ListProperty
 )
 from kivy.app import App
+from kivy.uix.behaviors import ButtonBehavior
 
 class PasswordTextInput(BoxLayout):
     text = StringProperty("")
@@ -17,7 +18,6 @@ class PasswordTextInput(BoxLayout):
         self.password = not self.password
 
 class SavingsPlanItem(BoxLayout):
-    """Елемент для відображення одного плану заощаджень у списку."""
     plan_name = StringProperty("")
     current_amount = NumericProperty(0)
     target_amount = NumericProperty(0)
@@ -25,8 +25,8 @@ class SavingsPlanItem(BoxLayout):
     days_left = NumericProperty(0)
     status = StringProperty("active")
     plan_id = NumericProperty(0)
-    on_plan_select = ObjectProperty(None)
     background_color = ListProperty([1, 1, 1, 1])
+    is_selected = BooleanProperty(False)
     
     # Додано для оптимізації KV-коду та візуального виділення
     is_selected = BooleanProperty(False) 
@@ -45,14 +45,11 @@ class SavingsPlanItem(BoxLayout):
         return super().on_touch_down(touch)
 
     def get_app(self):
-        """
-        Повертає екземпляр запущеної програми. 
-        Необхідно для коректної роботи KV-логіки виділення.
-        """
+   
         return App.get_running_app()
 
 class BottomMenuItem(BoxLayout):
-    """Елемент нижнього меню для перемикання вкладок."""
+
     tab_name = StringProperty("")
     icon_source = StringProperty("")
     

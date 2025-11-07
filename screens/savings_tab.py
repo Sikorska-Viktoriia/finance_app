@@ -12,6 +12,7 @@ from kivy.clock import Clock
 from db_manager import cursor, conn, log_transaction, log_savings_transaction
 from widgets import SavingsPlanItem
 
+
 class DatePickerPopup(Popup):
     """Custom date picker popup."""
     
@@ -136,7 +137,7 @@ class DatePickerPopup(Popup):
         self.dismiss()
 
 class SavingsTab(Screen):
-    """Savings plans tab."""
+
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -144,16 +145,16 @@ class SavingsTab(Screen):
         self.selected_plan_name = ""
     
     def get_app(self):
-        """Safe way to get app instance."""
+ 
         return App.get_running_app()
     
     def on_enter(self):
-        """Called when entering the tab."""
+
         Clock.schedule_once(lambda dt: self.update_savings_tab(), 0.1)
         self.clear_inputs()
     
     def clear_inputs(self):
-        """Clear all input fields."""
+
         if hasattr(self, 'ids'):
             if 'plan_name_input' in self.ids:
                 self.ids.plan_name_input.text = ""
@@ -171,7 +172,7 @@ class SavingsTab(Screen):
         self.update_operation_buttons()
     
     def update_operation_buttons(self):
-        """Update operation buttons state based on selection."""
+
         if not hasattr(self, 'ids'):
             return
             
@@ -188,14 +189,14 @@ class SavingsTab(Screen):
         
         if 'selected_plan_label' in self.ids:
             if has_selection:
-                self.ids.selected_plan_label.text = f"💰 Обрано: {self.selected_plan_name}"
+                self.ids.selected_plan_label.text = f"Обрано: {self.selected_plan_name}"
                 self.ids.selected_plan_label.color = (0.9, 0.3, 0.5, 1)
             else:
-                self.ids.selected_plan_label.text = "👆 Оберіть план для операцій"
+                self.ids.selected_plan_label.text = "Оберіть план для операцій"
                 self.ids.selected_plan_label.color = (0.5, 0.5, 0.5, 1)
     
     def show_calendar(self):
-        """Show custom date picker popup."""
+
         def set_date(date_str):
             self.ids.deadline_input.text = date_str
         
@@ -207,7 +208,7 @@ class SavingsTab(Screen):
         popup.open()
     
     def update_savings_tab(self):
-        """Refresh the list of savings plans."""
+
         if 'savings_container' not in self.ids:
             Clock.schedule_once(lambda dt: self.update_savings_tab(), 0.1)
             return
@@ -235,7 +236,7 @@ class SavingsTab(Screen):
             
             if not plans:
                 no_plans_label = Label(
-                    text="🎯 Ще немає планів заощаджень\n\nСтворіть свій перший план заощаджень!",
+                    text="Ще немає планів заощаджень\n\nСтворіть свій перший план заощаджень!",
                     font_size=dp(18),
                     color=(0.5, 0.5, 0.5, 1),
                     halign="center",
@@ -269,6 +270,18 @@ class SavingsTab(Screen):
                 plan_item.on_plan_select = self.on_plan_select
                 
                 savings_container.add_widget(plan_item)
+
+                if self.selected_plan_id == plan_id:
+                    plan_item.is_selected = True
+                else:
+                    plan_item.is_selected = False
+                
+                # КЛЮЧОВА ЗМІНА: ПРИВ'ЯЗКА on_release
+                plan_item.bind(
+                    on_release=lambda instance, p_id=plan_id, p_name=name: self.on_plan_select(p_id, p_name)
+                )
+                
+                savings_container.add_widget(plan_item)
                 
         except Exception as e:
             print(f"Error loading savings plans: {e}")
@@ -289,7 +302,7 @@ class SavingsTab(Screen):
         
         # Оновлюємо повідомлення
         if 'savings_message' in self.ids:
-            self.ids.savings_message.text = f"✅ Обрано план: {plan_name}"
+            self.ids.savings_message.text = f"Обрано план: {plan_name}"
             self.ids.savings_message.color = (0.2, 0.6, 0.2, 1)
     
     def create_savings_plan(self):
@@ -302,18 +315,18 @@ class SavingsTab(Screen):
         deadline = self.ids.deadline_input.text.strip()
         
         if not plan_name:
-            self.ids.savings_message.text = "❌ Будь ласка, введіть назву плану"
+            self.ids.savings_message.text = "Будь ласка, введіть назву плану"
             self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
             return
         
         try:
             target_amount = float(target_text)
             if target_amount <= 0:
-                self.ids.savings_message.text = "❌ Цільова сума має бути додатною"
+                self.ids.savings_message.text = "Цільова сума має бути додатною"
                 self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
                 return
         except ValueError:
-            self.ids.savings_message.text = "❌ Введіть коректну цільову суму"
+            self.ids.savings_message.text = "Введіть коректну цільову суму"
             self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
             return
         
@@ -321,7 +334,7 @@ class SavingsTab(Screen):
             try:
                 datetime.strptime(deadline, '%Y-%m-%d')
             except ValueError:
-                self.ids.savings_message.text = "❌ Невірний формат дати. Використовуйте РРРР-ММ-ДД"
+                self.ids.savings_message.text = "Невірний формат дати. Використовуйте РРРР-ММ-ДД"
                 self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
                 return
         
@@ -345,38 +358,38 @@ class SavingsTab(Screen):
             conn.commit()
             
             self.clear_inputs()
-            self.ids.savings_message.text = f"✅ План '{plan_name}' успішно створено!"
+            self.ids.savings_message.text = f"План '{plan_name}' успішно створено!"
             self.ids.savings_message.color = (0.2, 0.6, 0.2, 1)
             self.update_savings_tab()
             
         except Exception as e:
             print(f"Error creating plan: {e}")
-            self.ids.savings_message.text = f"❌ Помилка створення плану: {str(e)}"
+            self.ids.savings_message.text = f"Помилка створення плану: {str(e)}"
             self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
     
     def add_to_savings_plan(self):
         """Add money to selected savings plan."""
         if not self.selected_plan_id:
-            self.ids.savings_message.text = "❌ Будь ласка, оберіть план"
+            self.ids.savings_message.text = "Будь ласка, оберіть план"
             self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
             return
             
         try:
             amount_text = self.ids.savings_amount_input.text.strip()
             if not amount_text:
-                self.ids.savings_message.text = "❌ Будь ласка, введіть суму для додавання"
+                self.ids.savings_message.text = "Будь ласка, введіть суму для додавання"
                 self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
                 return
             
             amount = float(amount_text)
             if amount <= 0:
-                self.ids.savings_message.text = "❌ Сума має бути додатною"
+                self.ids.savings_message.text = "Сума має бути додатною"
                 self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
                 return
             
             app = self.get_app()
             if amount > app.balance:
-                self.ids.savings_message.text = f"❌ Недостатньо коштів у гаманці. Доступно: ${app.balance:.2f}"
+                self.ids.savings_message.text = f"Недостатньо коштів у гаманці. Доступно: ${app.balance:.2f}"
                 self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
                 return
             
@@ -387,7 +400,7 @@ class SavingsTab(Screen):
             plan = cursor.fetchone()
             
             if not plan:
-                self.ids.savings_message.text = "❌ План не знайдено"
+                self.ids.savings_message.text = "План не знайдено"
                 self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
                 return
             
@@ -395,7 +408,7 @@ class SavingsTab(Screen):
             
             if current_amount + amount > target_amount:
                 max_amount = target_amount - current_amount
-                self.ids.savings_message.text = f"❌ Сума перевищує ціль плану. Максимум: ${max_amount:.2f}"
+                self.ids.savings_message.text = f"Сума перевищує ціль плану. Максимум: ${max_amount:.2f}"
                 self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
                 return
             
@@ -430,34 +443,34 @@ class SavingsTab(Screen):
             conn.commit()
             
             self.ids.savings_amount_input.text = ""
-            self.ids.savings_message.text = f"✅ Успішно додано ${amount:.2f} до {self.selected_plan_name}"
+            self.ids.savings_message.text = f"Успішно додано ${amount:.2f} до {self.selected_plan_name}"
             self.ids.savings_message.color = (0.2, 0.6, 0.2, 1)
             self.update_savings_tab()
             
         except ValueError:
-            self.ids.savings_message.text = "❌ Введіть коректну суму"
+            self.ids.savings_message.text = "Введіть коректну суму"
             self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
         except Exception as e:
-            self.ids.savings_message.text = f"❌ Помилка: {str(e)}"
+            self.ids.savings_message.text = f"Помилка: {str(e)}"
             self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
 
     def remove_from_savings_plan(self):
         """Remove money from selected savings plan."""
         if not self.selected_plan_id:
-            self.ids.savings_message.text = "❌ Будь ласка, оберіть план"
+            self.ids.savings_message.text = "Будь ласка, оберіть план"
             self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
             return
             
         try:
             amount_text = self.ids.savings_amount_input.text.strip()
             if not amount_text:
-                self.ids.savings_message.text = "❌ Будь ласка, введіть суму для вилучення"
+                self.ids.savings_message.text = "Будь ласка, введіть суму для вилучення"
                 self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
                 return
             
             amount = float(amount_text)
             if amount <= 0:
-                self.ids.savings_message.text = "❌ Сума має бути додатною"
+                self.ids.savings_message.text = "Сума має бути додатною"
                 self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
                 return
             
@@ -469,14 +482,14 @@ class SavingsTab(Screen):
             plan = cursor.fetchone()
             
             if not plan:
-                self.ids.savings_message.text = "❌ План не знайдено"
+                self.ids.savings_message.text = "План не знайдено"
                 self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
                 return
             
             current_amount = plan[0]
             
             if amount > current_amount:
-                self.ids.savings_message.text = f"❌ Недостатньо коштів у плані. Доступно: ${current_amount:.2f}"
+                self.ids.savings_message.text = f"Недостатньо коштів у плані. Доступно: ${current_amount:.2f}"
                 self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
                 return
             
@@ -511,21 +524,21 @@ class SavingsTab(Screen):
             conn.commit()
             
             self.ids.savings_amount_input.text = ""
-            self.ids.savings_message.text = f"✅ Успішно вилучено ${amount:.2f} з {self.selected_plan_name}"
+            self.ids.savings_message.text = f"Успішно вилучено ${amount:.2f} з {self.selected_plan_name}"
             self.ids.savings_message.color = (0.2, 0.6, 0.2, 1)
             self.update_savings_tab()
             
         except ValueError:
-            self.ids.savings_message.text = "❌ Введіть коректну суму"
+            self.ids.savings_message.text = "Введіть коректну суму"
             self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
         except Exception as e:
-            self.ids.savings_message.text = f"❌ Помилка: {str(e)}"
+            self.ids.savings_message.text = f"Помилка: {str(e)}"
             self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
 
     def edit_savings_plan(self):
         """Edit selected savings plan."""
         if not self.selected_plan_id:
-            self.ids.savings_message.text = "❌ Будь ласка, оберіть план для редагування"
+            self.ids.savings_message.text = "Будь ласка, оберіть план для редагування"
             self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
             return
         
@@ -615,18 +628,18 @@ class SavingsTab(Screen):
                 new_deadline = deadline_input.text.strip()
                 
                 if not new_name:
-                    self.ids.savings_message.text = "❌ Введіть назву плану"
+                    self.ids.savings_message.text = "Введіть назву плану"
                     return
                 
                 if new_target <= 0:
-                    self.ids.savings_message.text = "❌ Цільова сума має бути додатною"
+                    self.ids.savings_message.text = "Цільова сума має бути додатною"
                     return
                 
                 if new_deadline:
                     try:
                         datetime.strptime(new_deadline, '%Y-%m-%d')
                     except ValueError:
-                        self.ids.savings_message.text = "❌ Невірний формат дати"
+                        self.ids.savings_message.text = "Невірний формат дати"
                         return
                 
                 cursor.execute(
@@ -650,27 +663,27 @@ class SavingsTab(Screen):
                 popup.dismiss()
                 self.update_savings_tab()
                 self.update_operation_buttons()
-                self.ids.savings_message.text = "✅ План успішно оновлено!"
+                self.ids.savings_message.text = "План успішно оновлено!"
                 self.ids.savings_message.color = (0.2, 0.6, 0.2, 1)
                 
             except ValueError:
-                self.ids.savings_message.text = "❌ Введіть коректну цільову суму"
+                self.ids.savings_message.text = "Введіть коректну цільову суму"
             except Exception as e:
                 print(f"Error updating plan: {e}")
-                self.ids.savings_message.text = f"❌ Помилка оновлення: {str(e)}"
+                self.ids.savings_message.text = f"Помилка оновлення: {str(e)}"
         
         save_btn = Button(text='💾 Зберегти', background_color=(0.9, 0.3, 0.5, 1))
         save_btn.bind(on_press=save_plan)
         btn_layout.add_widget(save_btn)
         
-        cancel_btn = Button(text='❌ Скасувати', background_color=(0.14, 0.76, 0.88, 1))
+        cancel_btn = Button(text='Скасувати', background_color=(0.14, 0.76, 0.88, 1))
         cancel_btn.bind(on_press=lambda x: popup.dismiss())
         btn_layout.add_widget(cancel_btn)
         
         content.add_widget(btn_layout)
         
         popup = Popup(
-            title='✏️ Редагування плану заощаджень',
+            title='Редагування плану заощаджень',
             content=content,
             size_hint=(0.8, 0.6),
             background_color=(0.95, 0.95, 1, 1)
@@ -680,7 +693,7 @@ class SavingsTab(Screen):
     def delete_savings_plan(self):
         """Delete selected savings plan with confirmation."""
         if not self.selected_plan_id:
-            self.ids.savings_message.text = "❌ Будь ласка, оберіть план для видалення"
+            self.ids.savings_message.text = "Будь ласка, оберіть план для видалення"
             self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
             return
         
@@ -737,26 +750,26 @@ class SavingsTab(Screen):
                 popup.dismiss()
                 self.clear_inputs()
                 self.update_savings_tab()
-                self.ids.savings_message.text = "✅ План успішно видалено!"
+                self.ids.savings_message.text = "План успішно видалено!"
                 self.ids.savings_message.color = (0.2, 0.6, 0.2, 1)
                 
             except Exception as e:
                 print(f"Error deleting plan: {e}")
-                self.ids.savings_message.text = f"❌ Помилка видалення: {str(e)}"
+                self.ids.savings_message.text = f"Помилка видалення: {str(e)}"
                 self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
         
-        delete_btn = Button(text='🗑️ Видалити', background_color=(0.8, 0.2, 0.2, 1))
+        delete_btn = Button(text='Видалити', background_color=(0.8, 0.2, 0.2, 1))
         delete_btn.bind(on_press=confirm_delete)
         btn_layout.add_widget(delete_btn)
         
-        cancel_btn = Button(text='❌ Скасувати', background_color=(0.14, 0.76, 0.88, 1))
+        cancel_btn = Button(text='Скасувати', background_color=(0.14, 0.76, 0.88, 1))
         cancel_btn.bind(on_press=lambda x: popup.dismiss())
         btn_layout.add_widget(cancel_btn)
         
         content.add_widget(btn_layout)
         
         popup = Popup(
-            title='⚠️ Підтвердження видалення',
+            title='Підтвердження видалення',
             content=content,
             size_hint=(0.8, 0.5),
             background_color=(0.95, 0.95, 1, 1)
