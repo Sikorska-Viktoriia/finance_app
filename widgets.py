@@ -28,8 +28,8 @@ class SavingsPlanItem(BoxLayout):
     background_color = ListProperty([1, 1, 1, 1])
     is_selected = BooleanProperty(False)
     
-    # Додано для оптимізації KV-коду та візуального виділення
-    is_selected = BooleanProperty(False) 
+    # ДОДАНО: Властивість для callback функції
+    on_plan_select = ObjectProperty(None, allownone=True)
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -45,11 +45,9 @@ class SavingsPlanItem(BoxLayout):
         return super().on_touch_down(touch)
 
     def get_app(self):
-   
         return App.get_running_app()
 
 class BottomMenuItem(BoxLayout):
-
     tab_name = StringProperty("")
     icon_source = StringProperty("")
     

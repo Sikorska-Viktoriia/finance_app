@@ -27,6 +27,39 @@
 #: set SELECTED_ITEM_COLOR (0.85, 0.95, 1.0, 1) # Виділення
 #: set WHITE_BG (1, 1, 1, 1)               # Білий фон для модальних вікон
 
+# Додайте ці стилі на початок KV файлу
+
+<WhitePopup@Popup>:
+    background_color: 1, 1, 1, 1
+    title_color: 0.1, 0.1, 0.1, 1
+    separator_color: 0.8, 0.8, 0.8, 1
+    separator_height: dp(1)
+
+<WhiteButton@Button>:
+    background_normal: ''
+    background_color: PRIMARY_BLUE
+    color: 1, 1, 1, 1
+    font_size: dp(16)
+    size_hint_y: None
+    height: dp(45)
+
+<WhiteTextInput@TextInput>:
+    multiline: False
+    padding: [dp(12), dp(12)]
+    background_color: 1, 1, 1, 1
+    background_normal: ''
+    background_active: ''
+    foreground_color: 0.1, 0.1, 0.1, 1
+    font_size: dp(16)
+    size_hint_y: None
+    height: dp(45)
+    cursor_color: 0.1, 0.1, 0.1, 1
+    canvas.before:
+        Color:
+            rgba: 0.9, 0.9, 0.9, 1
+        Line:
+            rounded_rectangle: [self.x, self.y, self.width, self.height, dp(5)]
+            width: 1
 
 <GradientBox@BoxLayout>:
     color1: 1, 1, 1, 1
@@ -628,11 +661,14 @@
                         background_color: PRIMARY_BLUE
                         on_press: root.show_calendar()
                         padding: adaptive_dp(5)
-                        Image:
-                            source: "icons/calendar.png"
-                            size_hint: None, None
-                            size: adaptive_dp(22), adaptive_dp(22)
-                            pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+                        BoxLayout:
+                            size: self.parent.size
+                            pos: self.parent.pos
+                            Image:
+                                source: "icons/calendar.png"
+                                size_hint: None, None
+                                size: adaptive_dp(22), adaptive_dp(22)
+                                pos_hint: {'center_x': 0.5, 'center_y': 0.5}
 
             StyledButton:
                 text: "Створити План"
@@ -640,11 +676,20 @@
                 size_hint_y: None
                 height: adaptive_dp(50)
                 on_press: root.create_savings_plan()
-                Image:
-                    source: "icons/rocket.png"
-                    size_hint: None, None
-                    size: adaptive_dp(24), adaptive_dp(24)
-                    pos_hint: {'center_x': 0.2, 'center_y': 0.5}
+                BoxLayout:
+                    size: self.parent.size
+                    pos: self.parent.pos
+                    padding: [adaptive_dp(15), 0]
+                    Image:
+                        source: "icons/rocket.png"
+                        size_hint: None, None
+                        size: adaptive_dp(24), adaptive_dp(24)
+                        pos_hint: {'center_y': 0.5}
+                    Label:
+                        text: "Створити План"
+                        color: 1, 1, 1, 1
+                        font_size: adaptive_font(16)
+                        bold: True
 
         # Повідомлення про статус
         Label:
@@ -657,90 +702,6 @@
             halign: 'center'
             valign: 'middle'
             font_size: adaptive_font(14)
-
-        # 2. БЛОК ОПЕРАЦІЙ З ОБРАНИМ ПЛАНОМ
-        GradientBox:
-            color1: LIGHT_BLUE
-            orientation: 'vertical'
-            padding: adaptive_padding(20)
-            spacing: adaptive_dp(15)
-            
-            Label:
-                id: selected_plan_label
-                text: f'Обрано: {root.selected_plan_name}' if root.selected_plan_id > 0 else 'Оберіть план для операцій'
-                color: PRIMARY_BLUE if root.selected_plan_id > 0 else (0.5, 0.5, 0.5, 1)
-                font_size: adaptive_font(15)
-                size_hint_y: None
-                height: adaptive_dp(25)
-                bold: True if root.selected_plan_id > 0 else False
-            
-            BoxLayout:
-                orientation: 'horizontal'
-                spacing: adaptive_dp(10)
-                size_hint_y: None
-                height: adaptive_dp(55) if not is_small_screen else adaptive_dp(45)
-                
-                StyledTextInput:
-                    id: savings_amount_input
-                    hint_text: 'Сума ($)'
-                    input_filter: 'float'
-                    size_hint_x: 0.4
-                
-                StyledButton:
-                    id: add_funds_btn
-                    text: "Додати"
-                    background_color: PRIMARY_PINK
-                    size_hint_x: 0.3
-                    disabled: root.selected_plan_id == 0
-                    on_press: root.add_to_savings_plan()
-                    Image:
-                        source: "icons/plus.png"
-                        size_hint: None, None
-                        size: adaptive_dp(20), adaptive_dp(20)
-                        pos_hint: {'center_x': 0.2, 'center_y': 0.5}
-                
-                StyledButton:
-                    id: withdraw_funds_btn
-                    text: "Вилучити"
-                    background_color: PRIMARY_BLUE
-                    size_hint_x: 0.3
-                    disabled: root.selected_plan_id == 0
-                    on_press: root.remove_from_savings_plan()
-                    Image:
-                        source: "icons/minus.png"
-                        size_hint: None, None
-                        size: adaptive_dp(20), adaptive_dp(20)
-                        pos_hint: {'center_x': 0.2, 'center_y': 0.5}
-            
-            BoxLayout:
-                orientation: 'horizontal'
-                spacing: adaptive_dp(10)
-                size_hint_y: None
-                height: adaptive_dp(50)
-                
-                StyledButton:
-                    id: edit_plan_btn
-                    text: "Редагувати"
-                    background_color: PRIMARY_BLUE
-                    disabled: root.selected_plan_id == 0
-                    on_press: root.edit_savings_plan()
-                    Image:
-                        source: "icons/edit.png"
-                        size_hint: None, None
-                        size: adaptive_dp(20), adaptive_dp(20)
-                        pos_hint: {'center_x': 0.2, 'center_y': 0.5}
-                        
-                StyledButton:
-                    id: delete_plan_btn
-                    text: "Видалити"
-                    background_color: ERROR_RED
-                    disabled: root.selected_plan_id == 0
-                    on_press: root.delete_savings_plan()
-                    Image:
-                        source: "icons/delete.png"
-                        size_hint: None, None
-                        size: adaptive_dp(20), adaptive_dp(20)
-                        pos_hint: {'center_x': 0.2, 'center_y': 0.5}
 
         # 3. БЛОК ВАШИХ АКТИВНИХ ПЛАНІВ
         Label:

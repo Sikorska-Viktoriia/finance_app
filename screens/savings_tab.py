@@ -12,7 +12,7 @@ from kivy.clock import Clock
 from db_manager import cursor, conn, log_transaction, log_savings_transaction
 from widgets import SavingsPlanItem
 
-# Константи кольорів для консистентності
+# Константи кольорів
 PRIMARY_PINK = (0.95, 0.3, 0.5, 1)
 PRIMARY_BLUE = (0.2, 0.7, 0.9, 1)
 LIGHT_PINK = (1, 0.95, 0.95, 1)
@@ -24,8 +24,8 @@ DARK_TEXT = (0.1, 0.1, 0.1, 1)
 LIGHT_GRAY = (0.9, 0.9, 0.9, 1)
 
 
-class StyledButton(Button):
-    """Стилізована кнопка для модальних вікон"""
+class WhiteButton(Button):
+    """Біла стилізована кнопка для модальних вікон"""
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.background_normal = ''
@@ -36,8 +36,8 @@ class StyledButton(Button):
         self.height = dp(45)
 
 
-class StyledTextInput(TextInput):
-    """Стилізоване текстове поле для модальних вікон"""
+class WhiteTextInput(TextInput):
+    """Біле стилізоване текстове поле"""
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.multiline = False
@@ -52,21 +52,27 @@ class StyledTextInput(TextInput):
         self.cursor_color = DARK_TEXT
 
 
-class DatePickerPopup(Popup):
-    """Custom date picker popup with white design."""
-    
-    def __init__(self, callback, **kwargs):
+class WhitePopup(Popup):
+    """Базовий клас білого попапу"""
+    def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.background_color = WHITE
         self.title_color = DARK_TEXT
         self.separator_color = LIGHT_GRAY
+        self.separator_height = dp(1)
+
+
+class DatePickerPopup(WhitePopup):
+    """Календар з білим дизайном"""
+    
+    def __init__(self, callback, **kwargs):
+        super().__init__(**kwargs)
         self.callback = callback
         self.selected_date = datetime.now().date()
         self.create_widgets()
     
     def create_widgets(self):
         content = BoxLayout(orientation='vertical', spacing=dp(15), padding=dp(20))
-        content.background_color = WHITE
         
         # Current date display
         self.date_label = Label(
@@ -82,15 +88,15 @@ class DatePickerPopup(Popup):
         # Date navigation
         nav_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(50), spacing=dp(10))
         
-        prev_btn = StyledButton(text='◀', background_color=PRIMARY_BLUE)
+        prev_btn = WhiteButton(text='◀')
         prev_btn.bind(on_press=self.prev_day)
         nav_layout.add_widget(prev_btn)
         
-        today_btn = StyledButton(text='Сьогодні', background_color=PRIMARY_PINK)
+        today_btn = WhiteButton(text='Сьогодні', background_color=PRIMARY_PINK)
         today_btn.bind(on_press=self.set_today)
         nav_layout.add_widget(today_btn)
         
-        next_btn = StyledButton(text='▶', background_color=PRIMARY_BLUE)
+        next_btn = WhiteButton(text='▶')
         next_btn.bind(on_press=self.next_day)
         nav_layout.add_widget(next_btn)
         
@@ -109,7 +115,7 @@ class DatePickerPopup(Popup):
         ]
         
         for text, color, callback in quick_buttons:
-            btn = StyledButton(text=text, background_color=color)
+            btn = WhiteButton(text=text, background_color=color)
             btn.bind(on_press=callback)
             quick_layout.add_widget(btn)
         
@@ -118,11 +124,11 @@ class DatePickerPopup(Popup):
         # Action buttons
         btn_layout = BoxLayout(orientation='horizontal', spacing=dp(15), size_hint_y=None, height=dp(50))
         
-        select_btn = StyledButton(text='Обрати дату', background_color=PRIMARY_PINK)
+        select_btn = WhiteButton(text='Обрати дату', background_color=PRIMARY_PINK)
         select_btn.bind(on_press=self.select_date)
         btn_layout.add_widget(select_btn)
         
-        cancel_btn = StyledButton(text='Скасувати', background_color=LIGHT_GRAY)
+        cancel_btn = WhiteButton(text='Скасувати', background_color=LIGHT_GRAY)
         cancel_btn.color = DARK_TEXT
         cancel_btn.bind(on_press=lambda x: self.dismiss())
         btn_layout.add_widget(cancel_btn)
@@ -192,37 +198,11 @@ class SavingsTab(Screen):
                 self.ids.target_amount_input.text = ""
             if 'deadline_input' in self.ids:
                 self.ids.deadline_input.text = ""
-            if 'savings_amount_input' in self.ids:
-                self.ids.savings_amount_input.text = ""
             if 'savings_message' in self.ids:
                 self.ids.savings_message.text = ""
         
         self.selected_plan_id = None
         self.selected_plan_name = ""
-        self.update_operation_buttons()
-    
-    def update_operation_buttons(self):
-        if not hasattr(self, 'ids'):
-            return
-            
-        has_selection = self.selected_plan_id is not None
-        
-        if 'add_funds_btn' in self.ids:
-            self.ids.add_funds_btn.disabled = not has_selection
-        if 'withdraw_funds_btn' in self.ids:
-            self.ids.withdraw_funds_btn.disabled = not has_selection
-        if 'edit_plan_btn' in self.ids:
-            self.ids.edit_plan_btn.disabled = not has_selection
-        if 'delete_plan_btn' in self.ids:
-            self.ids.delete_plan_btn.disabled = not has_selection
-        
-        if 'selected_plan_label' in self.ids:
-            if has_selection:
-                self.ids.selected_plan_label.text = f"Обрано: {self.selected_plan_name}"
-                self.ids.selected_plan_label.color = PRIMARY_PINK
-            else:
-                self.ids.selected_plan_label.text = "Оберіть план для операцій"
-                self.ids.selected_plan_label.color = (0.5, 0.5, 0.5, 1)
     
     def show_calendar(self):
         def set_date(date_str):
@@ -231,8 +211,7 @@ class SavingsTab(Screen):
         popup = DatePickerPopup(
             callback=set_date,
             title='Оберіть дату дедлайну',
-            size_hint=(0.85, 0.65),
-            separator_height=dp(1)
+            size_hint=(0.85, 0.65)
         )
         popup.open()
     
@@ -287,6 +266,10 @@ class SavingsTab(Screen):
                     except ValueError:
                         days_left = 0
                 
+                # Створюємо контейнер для плану з кнопками операцій
+                plan_container = BoxLayout(orientation='vertical', size_hint_y=None, height=dp(160))
+                
+                # Додаємо сам план
                 plan_item = SavingsPlanItem()
                 plan_item.plan_name = name
                 plan_item.current_amount = current
@@ -295,7 +278,6 @@ class SavingsTab(Screen):
                 plan_item.days_left = days_left
                 plan_item.status = status
                 plan_item.plan_id = plan_id
-                plan_item.on_plan_select = self.on_plan_select
                 
                 if self.selected_plan_id == plan_id:
                     plan_item.is_selected = True
@@ -306,7 +288,90 @@ class SavingsTab(Screen):
                     on_release=lambda instance, p_id=plan_id, p_name=name: self.on_plan_select(p_id, p_name)
                 )
                 
-                savings_container.add_widget(plan_item)
+                plan_container.add_widget(plan_item)
+                
+                # Додаємо кнопки операцій під кожним планом
+                operations_layout = BoxLayout(
+                    orientation='horizontal', 
+                    size_hint_y=None, 
+                    height=dp(50),
+                    spacing=dp(5),
+                    padding=[dp(10), dp(5), dp(10), dp(5)]
+                )
+                
+                # Поле для введення суми
+                amount_input = WhiteTextInput(
+                    hint_text='Сума',
+                    input_filter='float',
+                    size_hint_x=0.3,
+                    multiline=False,
+                    font_size=dp(14)
+                )
+                operations_layout.add_widget(amount_input)
+                
+                # Кнопка додати
+                add_btn = Button(
+                    text='Додати',
+                    size_hint_x=0.2,
+                    background_color=PRIMARY_PINK,
+                    color=WHITE,
+                    font_size=dp(12)
+                )
+                
+                def make_add_callback(pid, pname, inp):
+                    return lambda x: self.add_to_plan(pid, pname, inp.text)
+                
+                add_btn.bind(on_press=make_add_callback(plan_id, name, amount_input))
+                operations_layout.add_widget(add_btn)
+                
+                # Кнопка вилучити
+                withdraw_btn = Button(
+                    text='Вилучити',
+                    size_hint_x=0.2,
+                    background_color=PRIMARY_BLUE,
+                    color=WHITE,
+                    font_size=dp(12)
+                )
+                
+                def make_withdraw_callback(pid, pname, inp):
+                    return lambda x: self.remove_from_plan(pid, pname, inp.text)
+                
+                withdraw_btn.bind(on_press=make_withdraw_callback(plan_id, name, amount_input))
+                operations_layout.add_widget(withdraw_btn)
+                
+                # Кнопка редагувати
+                edit_btn = Button(
+                    text='Редаг.',
+                    size_hint_x=0.15,
+                    background_color=(0.2, 0.8, 0.3, 1),
+                    color=WHITE,
+                    font_size=dp(12)
+                )
+                
+                def make_edit_callback(pid, pname):
+                    return lambda x: self.edit_specific_plan(pid, pname)
+                
+                edit_btn.bind(on_press=make_edit_callback(plan_id, name))
+                operations_layout.add_widget(edit_btn)
+                
+                # Кнопка видалити
+                delete_btn = Button(
+                    text='×',
+                    size_hint_x=0.15,
+                    background_color=ERROR_RED,
+                    color=WHITE,
+                    font_size=dp(14),
+                    bold=True
+                )
+                
+                def make_delete_callback(pid, pname):
+                    return lambda x: self.delete_specific_plan(pid, pname)
+                
+                delete_btn.bind(on_press=make_delete_callback(plan_id, name))
+                operations_layout.add_widget(delete_btn)
+                
+                plan_container.add_widget(operations_layout)
+                savings_container.add_widget(plan_container)
                 
         except Exception as e:
             print(f"Error loading savings plans: {e}")
@@ -323,7 +388,6 @@ class SavingsTab(Screen):
         self.selected_plan_id = plan_id
         self.selected_plan_name = plan_name
         self.update_savings_tab()
-        self.update_operation_buttons()
         
         if 'savings_message' in self.ids:
             self.ids.savings_message.text = f"Обрано план: {plan_name}"
@@ -391,20 +455,14 @@ class SavingsTab(Screen):
             self.ids.savings_message.text = f"Помилка створення плану: {str(e)}"
             self.ids.savings_message.color = ERROR_RED
     
-    def add_to_savings_plan(self):
-        """Add money to selected savings plan."""
-        if not self.selected_plan_id:
-            self.ids.savings_message.text = "Будь ласка, оберіть план"
+    def add_to_plan(self, plan_id, plan_name, amount_text):
+        """Add money to specific plan"""
+        if not amount_text:
+            self.ids.savings_message.text = "Введіть суму"
             self.ids.savings_message.color = ERROR_RED
             return
             
         try:
-            amount_text = self.ids.savings_amount_input.text.strip()
-            if not amount_text:
-                self.ids.savings_message.text = "Будь ласка, введіть суму для додавання"
-                self.ids.savings_message.color = ERROR_RED
-                return
-            
             amount = float(amount_text)
             if amount <= 0:
                 self.ids.savings_message.text = "Сума має бути додатною"
@@ -413,13 +471,13 @@ class SavingsTab(Screen):
             
             app = self.get_app()
             if amount > app.balance:
-                self.ids.savings_message.text = f"Недостатньо коштів у гаманці. Доступно: ${app.balance:.2f}"
+                self.ids.savings_message.text = f"Недостатньо коштів. Доступно: ${app.balance:.2f}"
                 self.ids.savings_message.color = ERROR_RED
                 return
             
             cursor.execute(
                 "SELECT current_amount, target_amount FROM savings_plans WHERE id = ? AND user_id = ?",
-                (self.selected_plan_id, app.current_user_id)
+                (plan_id, app.current_user_id)
             )
             plan = cursor.fetchone()
             
@@ -432,7 +490,7 @@ class SavingsTab(Screen):
             
             if current_amount + amount > target_amount:
                 max_amount = target_amount - current_amount
-                self.ids.savings_message.text = f"Сума перевищує ціль плану. Максимум: ${max_amount:.2f}"
+                self.ids.savings_message.text = f"Максимум: ${max_amount:.2f}"
                 self.ids.savings_message.color = ERROR_RED
                 return
             
@@ -444,7 +502,7 @@ class SavingsTab(Screen):
             # Update savings plan
             cursor.execute(
                 "UPDATE savings_plans SET current_amount = current_amount + ? WHERE id = ?",
-                (amount, self.selected_plan_id)
+                (amount, plan_id)
             )
             
             log_transaction(
@@ -452,13 +510,13 @@ class SavingsTab(Screen):
                 app.current_user_id, 
                 "savings_transfer", 
                 amount, 
-                f"Переведено до плану: {self.selected_plan_name}"
+                f"Переведено до плану: {plan_name}"
             )
             
             log_savings_transaction(
                 cursor, conn,
                 app.current_user_id,
-                self.selected_plan_id,
+                plan_id,
                 amount,
                 "deposit",
                 f"Додано до плану заощаджень"
@@ -466,32 +524,22 @@ class SavingsTab(Screen):
             
             conn.commit()
             
-            self.ids.savings_amount_input.text = ""
-            self.ids.savings_message.text = f"Успішно додано ${amount:.2f} до {self.selected_plan_name}"
+            self.ids.savings_message.text = f"Успішно додано ${amount:.2f} до {plan_name}"
             self.ids.savings_message.color = SUCCESS_GREEN
             self.update_savings_tab()
             
         except ValueError:
             self.ids.savings_message.text = "Введіть коректну суму"
             self.ids.savings_message.color = ERROR_RED
-        except Exception as e:
-            self.ids.savings_message.text = f"Помилка: {str(e)}"
-            self.ids.savings_message.color = ERROR_RED
-
-    def remove_from_savings_plan(self):
-        """Remove money from selected savings plan."""
-        if not self.selected_plan_id:
-            self.ids.savings_message.text = "Будь ласка, оберіть план"
+    
+    def remove_from_plan(self, plan_id, plan_name, amount_text):
+        """Remove money from specific plan"""
+        if not amount_text:
+            self.ids.savings_message.text = "Введіть суму"
             self.ids.savings_message.color = ERROR_RED
             return
             
         try:
-            amount_text = self.ids.savings_amount_input.text.strip()
-            if not amount_text:
-                self.ids.savings_message.text = "Будь ласка, введіть суму для вилучення"
-                self.ids.savings_message.color = ERROR_RED
-                return
-            
             amount = float(amount_text)
             if amount <= 0:
                 self.ids.savings_message.text = "Сума має бути додатною"
@@ -501,7 +549,7 @@ class SavingsTab(Screen):
             app = self.get_app()
             cursor.execute(
                 "SELECT current_amount FROM savings_plans WHERE id = ? AND user_id = ?",
-                (self.selected_plan_id, app.current_user_id)
+                (plan_id, app.current_user_id)
             )
             plan = cursor.fetchone()
             
@@ -513,7 +561,7 @@ class SavingsTab(Screen):
             current_amount = plan[0]
             
             if amount > current_amount:
-                self.ids.savings_message.text = f"Недостатньо коштів у плані. Доступно: ${current_amount:.2f}"
+                self.ids.savings_message.text = f"Недостатньо коштів. Доступно: ${current_amount:.2f}"
                 self.ids.savings_message.color = ERROR_RED
                 return
             
@@ -525,7 +573,7 @@ class SavingsTab(Screen):
             # Update savings plan
             cursor.execute(
                 "UPDATE savings_plans SET current_amount = current_amount - ? WHERE id = ?",
-                (amount, self.selected_plan_id)
+                (amount, plan_id)
             )
             
             log_transaction(
@@ -533,13 +581,13 @@ class SavingsTab(Screen):
                 app.current_user_id, 
                 "savings_return", 
                 amount, 
-                f"Повернено з плану: {self.selected_plan_name}"
+                f"Повернено з плану: {plan_name}"
             )
             
             log_savings_transaction(
                 cursor, conn,
                 app.current_user_id,
-                self.selected_plan_id,
+                plan_id,
                 amount,
                 "withdrawal",
                 f"Вилучено з плану заощаджень"
@@ -547,17 +595,25 @@ class SavingsTab(Screen):
             
             conn.commit()
             
-            self.ids.savings_amount_input.text = ""
-            self.ids.savings_message.text = f"Успішно вилучено ${amount:.2f} з {self.selected_plan_name}"
+            self.ids.savings_message.text = f"Успішно вилучено ${amount:.2f} з {plan_name}"
             self.ids.savings_message.color = SUCCESS_GREEN
             self.update_savings_tab()
             
         except ValueError:
             self.ids.savings_message.text = "Введіть коректну суму"
             self.ids.savings_message.color = ERROR_RED
-        except Exception as e:
-            self.ids.savings_message.text = f"Помилка: {str(e)}"
-            self.ids.savings_message.color = ERROR_RED
+
+    def edit_specific_plan(self, plan_id, plan_name):
+        """Edit specific plan"""
+        self.selected_plan_id = plan_id
+        self.selected_plan_name = plan_name
+        self.edit_savings_plan()
+
+    def delete_specific_plan(self, plan_id, plan_name):
+        """Delete specific plan"""
+        self.selected_plan_id = plan_id
+        self.selected_plan_name = plan_name
+        self.delete_savings_plan()
 
     def edit_savings_plan(self):
         """Edit selected savings plan with white popup."""
@@ -568,7 +624,6 @@ class SavingsTab(Screen):
         
         # Create edit popup with white design
         content = BoxLayout(orientation='vertical', spacing=dp(15), padding=dp(25))
-        content.background_color = WHITE
         
         # Get current plan data
         cursor.execute(
@@ -590,7 +645,7 @@ class SavingsTab(Screen):
             color=DARK_TEXT,
             font_size=dp(16)
         ))
-        name_input = StyledTextInput(
+        name_input = WhiteTextInput(
             text=current_name, 
             size_hint_x=0.6
         )
@@ -605,7 +660,7 @@ class SavingsTab(Screen):
             color=DARK_TEXT,
             font_size=dp(16)
         ))
-        target_input = StyledTextInput(
+        target_input = WhiteTextInput(
             text=str(current_target), 
             size_hint_x=0.6
         )
@@ -621,14 +676,14 @@ class SavingsTab(Screen):
             font_size=dp(16)
         ))
         
-        deadline_input = StyledTextInput(
+        deadline_input = WhiteTextInput(
             text=current_deadline if current_deadline else "", 
             hint_text="РРРР-ММ-ДД",
             size_hint_x=0.4
         )
         deadline_layout.add_widget(deadline_input)
         
-        calendar_btn = StyledButton(
+        calendar_btn = WhiteButton(
             text='📅',
             size_hint_x=0.2,
             background_color=PRIMARY_BLUE
@@ -696,7 +751,6 @@ class SavingsTab(Screen):
                 self.selected_plan_name = new_name
                 popup.dismiss()
                 self.update_savings_tab()
-                self.update_operation_buttons()
                 self.ids.savings_message.text = "План успішно оновлено!"
                 self.ids.savings_message.color = SUCCESS_GREEN
                 
@@ -708,25 +762,21 @@ class SavingsTab(Screen):
                 self.ids.savings_message.text = f"Помилка оновлення: {str(e)}"
                 self.ids.savings_message.color = ERROR_RED
         
-        save_btn = StyledButton(text='💾 Зберегти', background_color=PRIMARY_PINK)
+        save_btn = WhiteButton(text='💾 Зберегти', background_color=PRIMARY_PINK)
         save_btn.bind(on_press=save_plan)
         btn_layout.add_widget(save_btn)
         
-        cancel_btn = StyledButton(text='Скасувати', background_color=LIGHT_GRAY)
+        cancel_btn = WhiteButton(text='Скасувати', background_color=LIGHT_GRAY)
         cancel_btn.color = DARK_TEXT
         cancel_btn.bind(on_press=lambda x: popup.dismiss())
         btn_layout.add_widget(cancel_btn)
         
         content.add_widget(btn_layout)
         
-        popup = Popup(
+        popup = WhitePopup(
             title='Редагування плану заощаджень',
             content=content,
-            size_hint=(0.85, 0.65),
-            background_color=WHITE,
-            title_color=DARK_TEXT,
-            separator_color=LIGHT_GRAY,
-            separator_height=dp(1)
+            size_hint=(0.85, 0.65)
         )
         popup.open()
 
@@ -739,7 +789,6 @@ class SavingsTab(Screen):
         
         # Create confirmation popup with white design
         content = BoxLayout(orientation='vertical', spacing=dp(20), padding=dp(25))
-        content.background_color = WHITE
         
         cursor.execute(
             "SELECT current_amount FROM savings_plans WHERE id = ?",
@@ -807,24 +856,20 @@ class SavingsTab(Screen):
                 self.ids.savings_message.text = f"Помилка видалення: {str(e)}"
                 self.ids.savings_message.color = ERROR_RED
         
-        delete_btn = StyledButton(text='Видалити', background_color=ERROR_RED)
+        delete_btn = WhiteButton(text='Видалити', background_color=ERROR_RED)
         delete_btn.bind(on_press=confirm_delete)
         btn_layout.add_widget(delete_btn)
         
-        cancel_btn = StyledButton(text='Скасувати', background_color=LIGHT_GRAY)
+        cancel_btn = WhiteButton(text='Скасувати', background_color=LIGHT_GRAY)
         cancel_btn.color = DARK_TEXT
         cancel_btn.bind(on_press=lambda x: popup.dismiss())
         btn_layout.add_widget(cancel_btn)
         
         content.add_widget(btn_layout)
         
-        popup = Popup(
+        popup = WhitePopup(
             title='Підтвердження видалення',
             content=content,
-            size_hint=(0.8, 0.5),
-            background_color=WHITE,
-            title_color=DARK_TEXT,
-            separator_color=LIGHT_GRAY,
-            separator_height=dp(1)
+            size_hint=(0.8, 0.5)
         )
         popup.open()
