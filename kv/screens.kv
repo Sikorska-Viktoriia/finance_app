@@ -26,40 +26,32 @@
 #: set CREATION_BUTTON (0.95, 0.3, 0.5, 1)  # Рожевий для кнопки
 #: set SELECTED_ITEM_COLOR (0.85, 0.95, 1.0, 1) # Виділення
 #: set WHITE_BG (1, 1, 1, 1)               # Білий фон для модальних вікон
-
-# Додайте ці стилі на початок KV файлу
-
-<WhitePopup@Popup>:
+#: set DARK_TEXT (0.1, 0.1, 0.1, 1)        # Темний текст для модальних вікон
+<WhitePopup>:
     background_color: 1, 1, 1, 1
     title_color: 0.1, 0.1, 0.1, 1
-    separator_color: 0.8, 0.8, 0.8, 1
-    separator_height: dp(1)
+    separator_color: 0.9, 0.9, 0.9, 1
+    separator_height: 1
 
-<WhiteButton@Button>:
+<WhiteButton>:
     background_normal: ''
-    background_color: PRIMARY_BLUE
+    background_color: 0.2, 0.7, 0.9, 1
     color: 1, 1, 1, 1
-    font_size: dp(16)
+    font_size: 16
     size_hint_y: None
-    height: dp(45)
+    height: 45
 
-<WhiteTextInput@TextInput>:
+<WhiteTextInput>:
     multiline: False
-    padding: [dp(12), dp(12)]
+    padding: [12, 12]
     background_color: 1, 1, 1, 1
     background_normal: ''
     background_active: ''
     foreground_color: 0.1, 0.1, 0.1, 1
-    font_size: dp(16)
+    font_size: 16
     size_hint_y: None
-    height: dp(45)
+    height: 45
     cursor_color: 0.1, 0.1, 0.1, 1
-    canvas.before:
-        Color:
-            rgba: 0.9, 0.9, 0.9, 1
-        Line:
-            rounded_rectangle: [self.x, self.y, self.width, self.height, dp(5)]
-            width: 1
 
 <GradientBox@BoxLayout>:
     color1: 1, 1, 1, 1
@@ -639,12 +631,14 @@
                     id: plan_name_input
                     hint_text: 'Назва плану...'
                     size_hint_x: 0.35
+                    background_color: 1, 1, 1, 1
                 
                 StyledTextInput:
                     id: target_amount_input
                     hint_text: 'Цільова сума ($)'
                     input_filter: 'float'
                     size_hint_x: 0.3
+                    background_color: 1, 1, 1, 1
                 
                 BoxLayout:
                     orientation: 'horizontal'
@@ -655,6 +649,7 @@
                         id: deadline_input
                         hint_text: 'Дедлайн'
                         size_hint_x: 0.7
+                        background_color: 1, 1, 1, 1
                     
                     StyledButton:
                         size_hint_x: 0.3
@@ -670,26 +665,13 @@
                                 size: adaptive_dp(22), adaptive_dp(22)
                                 pos_hint: {'center_x': 0.5, 'center_y': 0.5}
 
+            # ВИПРАВЛЕНА КНОПКА - ВИДАЛЕНО ДУБЛЮВАННЯ ТЕКСТУ
             StyledButton:
                 text: "Створити План"
                 background_color: PRIMARY_PINK
                 size_hint_y: None
                 height: adaptive_dp(50)
                 on_press: root.create_savings_plan()
-                BoxLayout:
-                    size: self.parent.size
-                    pos: self.parent.pos
-                    padding: [adaptive_dp(15), 0]
-                    Image:
-                        source: "icons/rocket.png"
-                        size_hint: None, None
-                        size: adaptive_dp(24), adaptive_dp(24)
-                        pos_hint: {'center_y': 0.5}
-                    Label:
-                        text: "Створити План"
-                        color: 1, 1, 1, 1
-                        font_size: adaptive_font(16)
-                        bold: True
 
         # Повідомлення про статус
         Label:
@@ -745,7 +727,7 @@
             height: adaptive_dp(120) if not is_small_screen else adaptive_dp(90)
         
         Label:
-            text: "🤖 AI Assistant"
+            text: "AI Assistant"
             font_size: adaptive_font(28) if not is_small_screen else adaptive_font(24)
             bold: True
             color: PRIMARY_PINK
@@ -777,7 +759,7 @@
             height: adaptive_dp(120) if not is_small_screen else adaptive_dp(90)
         
         Label:
-            text: "👤 Account Settings"
+            text: "Account Settings"
             font_size: adaptive_font(28) if not is_small_screen else adaptive_font(24)
             bold: True
             color: PRIMARY_PINK
