@@ -1,18 +1,31 @@
 #:kivy 2.3.1
 #:import dp kivy.metrics.dp
-#:import ProgressBar kivy.uix.progressbar.ProgressBar
+#:import Window kivy.core.window.Window
+#:import Platform kivy.utils.platform
 
-# -----------------------
-# CORE COLORS
-# -----------------------
-# Flamingo Pink (Primary Action): 1.0, 0.42, 0.42, 1
-# Aqua Teal (Secondary/Background Accent): 0.14, 0.76, 0.88, 1
-# Dark Text: 0.05, 0.05, 0.15, 1
-# Light Background: 1.0, 0.98, 0.98, 1 (almost white)
+#:set is_mobile True if Platform in ['android', 'ios'] else False
+#:set screen_width Window.width
+#:set screen_height Window.height
+#:set is_small_screen screen_width < 400
+#:set is_tablet screen_width >= 600
 
-# -----------------------
-# Gradient BoxLayout with Rounded Corners
-# -----------------------
+#:set scale_factor 1.0 if is_tablet else (0.9 if is_small_screen else 1.0)
+#:set text_scale 1.0 if is_tablet else (0.9 if is_small_screen else 1.0)
+#:set padding_scale 1.0 if is_tablet else (0.8 if is_small_screen else 1.0)
+
+#:set adaptive_dp lambda x: dp(x * scale_factor)
+#:set adaptive_font lambda x: dp(x * text_scale)
+#:set adaptive_padding lambda x: dp(x * padding_scale)
+
+
+#: set DARK_BURGUNDY (0.5, 0.1, 0.2, 1) 
+#: set LIGHT_PINK (1, 0.9, 0.95, 1)    
+#: set TURQUOISE (0.14, 0.76, 0.88, 1) 
+#: set SUCCESS_GREEN (0.2, 0.6, 0.2, 1)
+#: set ERROR_RED (0.8, 0.2, 0.2, 1) 
+#: set CREATION_BUTTON (0.8, 0.4, 0.45, 1) # Рожево-червоний для кнопки Створити
+#: set SELECTED_ITEM_COLOR (0.8, 0.95, 0.95, 1) # Дуже світло-бірюзовий для виділення
+
 <GradientBox@BoxLayout>:
     color1: 1, 1, 1, 1
     canvas.before:
@@ -21,75 +34,51 @@
         RoundedRectangle:
             pos: self.pos
             size: self.size
-            radius: [dp(30),]
+            radius: [adaptive_dp(30),]
 
-# -----------------------
-# Styled Button with Rounded Corners for All Screens
-# -----------------------
 <StyledButton@Button>:
     background_normal: ''
     background_color: 1, 1, 1, 1
     color: 1, 1, 1, 1
-    font_size: dp(18)
+    font_size: adaptive_font(18)
     size_hint_y: None
-    height: dp(55)
+    height: adaptive_dp(60)
     canvas.before:
         Color:
             rgba: self.background_color
         RoundedRectangle:
             pos: self.pos
             size: self.size
-            radius: [dp(15),]
+            radius: [adaptive_dp(15),]
 
-# -----------------------
-# Base Logo Widget (for StartScreen)
-# -----------------------
 <AppLogo@RelativeLayout>:
     size_hint_y: None
-    height: self.parent.height * 0.35
-    canvas:
-        Color:
-            rgba: 1.0, 0.42, 0.42, 1
-        Ellipse:
-            pos: self.center_x - dp(70), self.center_y - dp(70)
-            size: dp(140), dp(140)
+    height: adaptive_dp(150) if not is_small_screen else adaptive_dp(120)
     Image:
         source: "flamingo_logo.png"
         size_hint: None, None
-        size: dp(130), dp(130)
+        size: adaptive_dp(130), adaptive_dp(130) if not is_small_screen else (adaptive_dp(100), adaptive_dp(100))
         pos_hint: {'center_x': 0.5, 'center_y': 0.5}
 
-# -----------------------
-# Logo Widget for Login/Registration Forms (smaller than StartScreen)
-# -----------------------
 <LoginFormLogo@RelativeLayout>:
     size_hint_y: None
-    height: self.parent.height * 0.25
-    canvas:
-        Color:
-            rgba: 1.0, 0.42, 0.42, 1
-        Ellipse:
-            pos: self.center_x - dp(60), self.center_y - dp(60)
-            size: dp(120), dp(120)
+    height: adaptive_dp(120) if not is_small_screen else adaptive_dp(90)
     Image:
         source: "flamingo_logo.png"
         size_hint: None, None
-        size: dp(110), dp(110)
+        size: adaptive_dp(110), adaptive_dp(110) if not is_small_screen else (adaptive_dp(80), adaptive_dp(80))
         pos_hint: {'center_x': 0.5, 'center_y': 0.5}
 
-# -----------------------
-# SIMPLIFIED TextInput
-# -----------------------
 <StyledTextInput@TextInput>:
     multiline: False
-    padding: [dp(15), dp(15)]
+    padding: [adaptive_dp(15), adaptive_dp(17)]
     background_color: 1, 1, 1, 0
     background_normal: ''
     background_active: ''
     foreground_color: 0.05, 0.05, 0.15, 1
-    font_size: dp(18)
+    font_size: adaptive_font(18)
     size_hint_y: None
-    height: dp(50)
+    height: adaptive_dp(55) if not is_small_screen else adaptive_dp(45)
     cursor_color: 0.05, 0.05, 0.15, 1
     canvas.before:
         Color:
@@ -97,20 +86,18 @@
         RoundedRectangle:
             pos: self.pos
             size: self.size
-            radius: [dp(10),]
+            radius: [adaptive_dp(10),]
         Color:
             rgba: 0.8, 0.8, 0.8, 1
         Line:
-            rounded_rectangle: [self.x, self.y, self.width, self.height, dp(10)]
+            rounded_rectangle: [self.x, self.y, self.width, self.height, adaptive_dp(10)]
             width: 1
 
-# -----------------------
-# Password TextInput with Toggle
-# -----------------------
 <PasswordTextInput>:
+    size_hint_y: None
+    height: adaptive_dp(55) if not is_small_screen else adaptive_dp(45)
     RelativeLayout:
-        size_hint_y: None
-        height: dp(40)
+        size_hint: 1, 1
         
         TextInput:
             id: password_input
@@ -118,12 +105,12 @@
             hint_text: root.hint_text
             password: root.password
             multiline: False
-            padding: [dp(15), (self.height - self.font_size) / 2, dp(50), (self.height - self.font_size) / 2]
+            padding: [adaptive_dp(15), (self.height - self.line_height) / 2, adaptive_dp(55), (self.height - self.line_height) / 2]
             background_color: 1, 1, 1, 0
             background_normal: ''
             background_active: ''
             foreground_color: 0.05, 0.05, 0.15, 1
-            font_size: dp(16)
+            font_size: adaptive_font(18)
             size_hint: 1, 1
             cursor_color: 0.05, 0.05, 0.15, 1
             canvas.before:
@@ -132,17 +119,17 @@
                 RoundedRectangle:
                     pos: self.pos
                     size: self.size
-                    radius: [dp(10),]
+                    radius: [adaptive_dp(10),]
                 Color:
                     rgba: 0.8, 0.8, 0.8, 1
                 Line:
-                    rounded_rectangle: [self.x, self.y, self.width, self.height, dp(10)]
+                    rounded_rectangle: [self.x, self.y, self.width, self.height, adaptive_dp(10)]
                     width: 1
         
         Button:
             size_hint: None, None
-            size: dp(40), dp(40)
-            pos_hint: {'right': 1, 'center_y': 0.5}
+            size: adaptive_dp(45), adaptive_dp(45) if not is_small_screen else (adaptive_dp(35), adaptive_dp(35))
+            pos_hint: {'right': 0.98, 'center_y': 0.5}
             background_color: 0, 0, 0, 0
             background_normal: ''
             on_press: root.toggle_password()
@@ -150,130 +137,132 @@
             Image:
                 source: "icons/eye_open.png" if root.password else "icons/eye_closed.png"
                 size_hint: None, None
-                size: dp(45), dp(45)
-                pos: self.parent.pos
-                center_x: self.parent.center_x
-                center_y: self.parent.center_y
+                size: adaptive_dp(28), adaptive_dp(28) if not is_small_screen else (adaptive_dp(22), adaptive_dp(22))
+                pos_hint: {'center_x': 0.5, 'center_y': 0.5}
+                center: self.parent.center_x, self.parent.center_y
 
-# -----------------------
-# Bottom Menu Item
-# -----------------------
 <BottomMenuItem>:
     orientation: 'vertical'
     size_hint_x: 1
-    spacing: dp(5)
-    padding: [dp(5), dp(5), dp(5), dp(10)]
+    spacing: adaptive_dp(5)
+    padding: [adaptive_dp(5), adaptive_dp(5), adaptive_dp(5), adaptive_dp(10)]
     
     Image:
         source: root.icon_source
         size_hint: None, None
-        size: dp(35), dp(35)
+        size: adaptive_dp(35), adaptive_dp(35) if not is_small_screen else (adaptive_dp(28), adaptive_dp(28))
         pos_hint: {'center_x': 0.5}
 
-# -----------------------
-# Savings Plan Item Widget
-# -----------------------
 <SavingsPlanItem>:
-    orientation: 'vertical'
+    is_selected: False # Прив'язка до BooleanProperty у Python
+    
+    # Висота елемента
     size_hint_y: None
-    height: dp(120)
-    padding: [dp(10), dp(10)]
-    spacing: dp(5)
+    height: dp(80) 
+    padding: dp(10)
+    
+    # Стиль блоку (тінь/заокруглення)
     canvas.before:
         Color:
-            rgba: 1, 1, 1, 1
-        RoundedRectangle:
+            # === ВИПРАВЛЕННЯ: Використовуємо is_selected, щоб уникнути помилки 173 ===
+            rgba: SELECTED_ITEM_COLOR if root.is_selected else (0.98, 0.98, 0.98, 1)
+        Rectangle:
             pos: self.pos
             size: self.size
-            radius: [dp(15),]
+        # Невелика рамка
         Color:
-            rgba: 0.9, 0.9, 0.9, 1
+            rgba: DARK_BURGUNDY[0], DARK_BURGUNDY[1], DARK_BURGUNDY[2], 0.3
         Line:
-            rounded_rectangle: [self.x, self.y, self.width, self.height, dp(15)]
-            width: 1
+            width: 1.5
+            rectangle: self.x, self.y, self.width, self.height
+            
+    # Обробник кліку для вибору плану
+    on_touch_down:
+        if self.collide_point(*args[1].pos): root.on_plan_select(root.plan_id, root.plan_name)
     
     BoxLayout:
-        size_hint_y: None
-        height: dp(25)
-        Label:
-            text: root.plan_name
-            font_size: dp(18)
-            bold: True
-            color: 0.05, 0.05, 0.15, 1
-            text_size: self.width, None
-            halign: 'left'
-            valign: 'middle'
-        Label:
-            text: "Completed" if root.progress >= 100 else f"{root.days_left} days left" if root.days_left > 0 else "No deadline"
-            font_size: dp(14)
-            color: 0.5, 0.5, 0.5, 1
-            size_hint_x: 0.5
-            text_size: self.width, None
-            halign: 'right'
-            valign: 'middle'
-    
-    ProgressBar:
-        value: root.progress
-        max: 100
-        size_hint_y: None
-        height: dp(20)
-    
-    BoxLayout:
-        size_hint_y: None
-        height: dp(25)
-        Label:
-            text: f"${root.current_amount:.2f} / ${root.target_amount:.2f}"
-            font_size: dp(16)
-            color: 0.05, 0.05, 0.15, 1
-            text_size: self.width, None
-            halign: 'left'
-            valign: 'middle'
-        Label:
-            text: f"{root.progress:.1f}%"
-            font_size: dp(16)
-            bold: True
-            color: (0.14, 0.76, 0.88, 1) if root.progress < 100 else (0.2, 0.8, 0.2, 1)
-            text_size: self.width, None
-            halign: 'right'
-            valign: 'middle'
-    
-    StyledButton:
-        text: "Add Money" if root.progress < 100 else "Completed"
-        background_color: (1.0, 0.42, 0.42, 1) if root.progress < 100 else (0.2, 0.8, 0.2, 1)
-        size_hint_y: None
-        height: dp(35)
-        font_size: dp(14)
-        disabled: root.progress >= 100
-        on_press: root.add_to_plan()
+        orientation: 'vertical'
+        padding: dp(5)
+        spacing: dp(3)
+        
+        # Верхній рядок: Назва та Суми
+        BoxLayout:
+            size_hint_y: None
+            height: dp(25)
+            
+            Label:
+                text: root.plan_name
+                font_size: dp(16)
+                color: DARK_BURGUNDY
+                halign: 'left'
+                text_size: self.size
+                size_hint_x: 0.6
+                bold: True
+            
+            Label:
+                text: f"${root.current_amount:.2f} / ${root.target_amount:.2f}"
+                font_size: dp(14)
+                color: DARK_BURGUNDY
+                halign: 'right'
+                text_size: self.size
+                size_hint_x: 0.4
+                
+        # Середній рядок: Прогрес-бар та Відсотки
+        BoxLayout:
+            size_hint_y: None
+            height: dp(15)
+            spacing: dp(5)
+            
+            ProgressBar:
+                value: root.progress
+                max: 100
+                size_hint_x: 0.7
+                background_color: 0.9, 0.9, 0.9, 1
+                foreground_color: TURQUOISE
+                
+            Label:
+                text: f"{root.progress:.0f}%"
+                font_size: dp(12)
+                color: DARK_BURGUNDY
+                size_hint_x: 0.15
+            
+            Label:
+                text: f"{root.days_left} дн." if root.days_left > 0 else "∞"
+                font_size: dp(12)
+                color: TURQUOISE if root.days_left > 30 else ERROR_RED
+                size_hint_x: 0.15
 
-# -----------------------
-# StartScreen
-# -----------------------
 <StartScreen>:
     name: 'start_screen'
+    canvas.before:
+        Color:
+            rgba: 0.14, 0.76, 0.88, 1
+        Rectangle:
+            pos: self.pos
+            size: self.size
     GradientBox:
-        color1: 0.14, 0.76, 0.88, 1
+        color1: 0.9, 0.95, 1.0, 0
         orientation: 'vertical'
-        padding: dp(40)
-        spacing: dp(30)
+        padding: adaptive_padding(40)
+        spacing: adaptive_dp(30)
         
         AppLogo:
-            height: self.parent.height * 0.35
+            height: adaptive_dp(150) if not is_small_screen else adaptive_dp(120)
 
         Label:
             text: "Flamingo Cash"
-            font_size: dp(48)
+            font_size: adaptive_font(48) if not is_small_screen else adaptive_font(36)
             bold: True
             color: 1, 1, 1, 1
             size_hint_y: None
-            height: dp(60)
+            height: adaptive_dp(60) if not is_small_screen else adaptive_dp(45)
 
         Label:
             text: "Your modern financial assistant"
-            font_size: dp(18)
+            font_size: adaptive_font(18) if not is_small_screen else adaptive_font(16)
             color: 1, 1, 1, 0.8
             size_hint_y: None
-            height: dp(25)
+            height: adaptive_dp(25)
 
         Widget:
 
@@ -292,479 +281,612 @@
                 root.manager.transition.direction = 'left'
                 root.manager.current = "registration_screen"
 
-# -----------------------
-# Registration Screen
-# -----------------------
 <RegistrationScreen>:
-    name: 'registration_screen'
+    name: "registration_screen"
+    canvas.before:
+        Color:
+            rgba: 0.9, 0.95, 1.0, 1
+        Rectangle:
+            pos: self.pos
+            size: self.size
     GradientBox:
-        color1: 1.0, 0.98, 0.98, 1
-        orientation: 'vertical'
-        padding: dp(20)
-        spacing: dp(15)
-
+        color1: 1.0, 0.98, 0.98, 0
+        orientation: "vertical"
+        padding: adaptive_padding(30)
+        spacing: adaptive_dp(20)
+        
         LoginFormLogo:
+            height: adaptive_dp(100) if not is_small_screen else adaptive_dp(80)
 
         Label:
-            text: "Create Account"
-            font_size: dp(36)
-            size_hint_y: None
-            height: dp(50)
-            color: 0.05, 0.05, 0.15, 1
+            text: "Створити обліковий запис"
+            font_size: adaptive_font(30) if not is_small_screen else adaptive_font(24)
             bold: True
+            color: 0.05, 0.05, 0.15, 1
+            size_hint_y: None
+            height: adaptive_dp(40)
 
-        StyledTextInput:
-            id: username
-            hint_text: "Username"
+        BoxLayout:
+            orientation: "vertical"
+            spacing: adaptive_dp(15)
+            size_hint_y: None
+            height: adaptive_dp(275) if not is_small_screen else adaptive_dp(220)
 
-        StyledTextInput:
-            id: email
-            hint_text: "Email"
+            StyledTextInput:
+                id: username
+                hint_text: "Ім'я користувача"
+            
+            StyledTextInput:
+                id: email
+                hint_text: "Електронна пошта"
+                    
+            PasswordTextInput:
+                id: password_field
+                hint_text: "Пароль"
 
-        PasswordTextInput:
-            id: password_field
-            hint_text: "Password"
+            PasswordTextInput:
+                id: password_confirm_field
+                hint_text: "Підтвердіть пароль"
+
+        StyledButton:
+            text: "Зареєструватися"
+            background_color: 1.0, 0.42, 0.42, 1
+            size_hint_y: None
+            height: adaptive_dp(60) if not is_small_screen else adaptive_dp(50)
+            on_press: root.register_user()
 
         Label:
             id: reg_message
             text: ""
-            color: 1, 0, 0, 1
+            color: 0.8, 0, 0, 1
             size_hint_y: None
-            height: dp(30)
-            text_size: self.width, None
-
-        Widget:
+            height: adaptive_dp(30)
 
         BoxLayout:
             size_hint_y: None
-            height: dp(55)
-            spacing: dp(10)
-            
+            height: adaptive_dp(40)
+            Label:
+                text: "Вже маєте обліковий запис?"
+                color: 0.2, 0.2, 0.2, 1
+                font_size: adaptive_font(14)
             StyledButton:
-                text: "Register"
-                background_color: 1.0, 0.42, 0.42, 1
-                on_press: root.register_user()
+                text: "Увійти"
+                background_color: 0.8, 0.8, 0.8, 0
+                color: 0.14, 0.76, 0.88, 1
+                font_size: adaptive_font(16)
+                bold: True
+                size_hint_x: 0.5
+                size_hint_y: None
+                height: adaptive_dp(40)
+                on_press: root.manager.current = 'login_screen'
 
-            StyledButton:
-                text: "Back"
-                background_color: 0.14, 0.76, 0.88, 1
-                color: 1, 1, 1, 1
-                on_press:
-                    root.manager.transition.direction = 'right'
-                    root.manager.current = "start_screen"
-
-# -----------------------
-# Login Screen
-# -----------------------
 <LoginScreen>:
-    name: 'login_screen'
+    name: "login_screen"
+    canvas.before:
+        Color:
+            rgba: 0.9, 0.95, 1.0, 1
+        Rectangle:
+            pos: self.pos
+            size: self.size
     GradientBox:
-        color1: 1.0, 0.98, 0.98, 1
-        orientation: 'vertical'
-        padding: dp(20)
-        spacing: dp(15)
+        color1: 0.9, 0.95, 1.0, 0
+        orientation: "vertical"
+        padding: adaptive_padding(30)
+        spacing: adaptive_dp(25)
 
         LoginFormLogo:
+            height: adaptive_dp(120) if not is_small_screen else adaptive_dp(90)
 
         Label:
-            text: "Login to Flamingo Cash"
-            font_size: dp(36)
-            size_hint_y: None
-            height: dp(50)
-            color: 0.05, 0.05, 0.15, 1
+            text: "Вхід до системи"
+            font_size: adaptive_font(34) if not is_small_screen else adaptive_font(28)
             bold: True
+            color: 0.05, 0.05, 0.15, 1
+            size_hint_y: None
+            height: adaptive_dp(50)
+        
+        BoxLayout:
+            orientation: "vertical"
+            spacing: adaptive_dp(15)
+            size_hint_y: None
+            height: adaptive_dp(125) if not is_small_screen else adaptive_dp(100)
 
-        StyledTextInput:
-            id: email
-            hint_text: "Email"
+            StyledTextInput:
+                id: email
+                hint_text: "Електронна пошта"
 
-        PasswordTextInput:
-            id: password_field
-            hint_text: "Password"
+            PasswordTextInput:
+                id: password_field
+                hint_text: "Пароль"
+
+        StyledButton:
+            text: "Увійти"
+            background_color: 0.14, 0.76, 0.88, 1
+            size_hint_y: None
+            height: adaptive_dp(60) if not is_small_screen else adaptive_dp(50)
+            on_press: root.login_user()
 
         Label:
             id: login_message
             text: ""
-            color: 1, 0, 0, 1
+            color: 0.8, 0, 0, 1
             size_hint_y: None
-            height: dp(30)
-            text_size: self.width, None
+            height: adaptive_dp(30)
 
         Widget:
-
+            size_hint_y: 1
+        
         BoxLayout:
             size_hint_y: None
-            height: dp(55)
+            height: adaptive_dp(40)
+            Label:
+                text: "Ще не маєте облікового запису?"
+                color: 0.2, 0.2, 0.2, 1
+                font_size: adaptive_font(14)
+            StyledButton:
+                text: "Зареєструватися"
+                background_color: 0.8, 0.8, 0.8, 0
+                color: 1.0, 0.42, 0.42, 1
+                font_size: adaptive_font(16)
+                bold: True
+                size_hint_x: 0.5
+                size_hint_y: None
+                height: adaptive_dp(40)
+                on_press: root.manager.current = 'registration_screen'
+
+<HomeTab>:
+    name: "home_tab"
+    canvas.before:
+        Color:
+            rgba: 0.95, 0.98, 1.0, 1
+        Rectangle:
+            pos: self.pos
+            size: self.size
+    
+    BoxLayout:
+        orientation: "vertical"
+        padding: adaptive_padding(20)
+        spacing: adaptive_dp(15)
+        
+        BoxLayout:
+            orientation: "vertical"
+            size_hint_y: None
+            height: adaptive_dp(300) if not is_small_screen else adaptive_dp(250)
+            spacing: adaptive_dp(15)
+            
+            LoginFormLogo:
+                height: adaptive_dp(80) if not is_small_screen else adaptive_dp(60)
+
+            Label:
+                id: welcome_label
+                text: "Welcome!"
+                font_size: adaptive_font(28) if not is_small_screen else adaptive_font(24)
+                bold: True
+                color: 0.05, 0.05, 0.15, 1
+                size_hint_y: None
+                height: adaptive_dp(40)
+
+            Label:
+                id: balance_label
+                text: "Balance: $0"
+                font_size: adaptive_font(24) if not is_small_screen else adaptive_font(20)
+                color: 0.05, 0.05, 0.15, 1
+                size_hint_y: None
+                height: adaptive_dp(35)
+
+            BoxLayout:
+                spacing: adaptive_dp(15)
+                size_hint_y: None
+                height: adaptive_dp(60) if not is_small_screen else adaptive_dp(50)
+                StyledTextInput:
+                    id: amount_input
+                    hint_text: "Enter amount"
+                    input_filter: "float"
+                    height: adaptive_dp(55) if not is_small_screen else adaptive_dp(45)
+
+                StyledButton:
+                    text: "Add"
+                    background_color: 1.0, 0.42, 0.42, 1
+                    size_hint_x: 0.4
+                    on_press: root.add_money()
+
+                StyledButton:
+                    text: "Remove"
+                    background_color: 0.14, 0.76, 0.88, 1
+                    size_hint_x: 0.4
+                    on_press: root.remove_money()
+
+        Label:
+            text: "Transaction History"
+            font_size: adaptive_font(20) if not is_small_screen else adaptive_font(18)
+            bold: True
+            color: 0.05, 0.05, 0.15, 1
+            size_hint_y: None
+            height: adaptive_dp(35)
+
+        ScrollView:
+            size_hint_y: 1
+            do_scroll_x: False
+            bar_width: adaptive_dp(8)
+            bar_color: 0.14, 0.76, 0.88, 0.7
+            
+            BoxLayout:
+                id: history_container
+                orientation: 'vertical'
+                spacing: adaptive_dp(8)
+                size_hint_y: None
+                height: self.minimum_height
+                padding: [adaptive_dp(5), adaptive_dp(5)]
+
+<AnalyticsTab>:
+    name: "analytics_tab"
+    canvas.before:
+        Color:
+            rgba: 0.95, 0.98, 1.0, 1
+        Rectangle:
+            pos: self.pos
+            size: self.size
+    
+    BoxLayout:
+        orientation: 'vertical'
+        padding: adaptive_padding(40)
+        spacing: adaptive_dp(20)
+        
+        LoginFormLogo:
+            height: adaptive_dp(120) if not is_small_screen else adaptive_dp(90)
+        
+        Label:
+            text: "📊 Analytics"
+            font_size: adaptive_font(28) if not is_small_screen else adaptive_font(24)
+            bold: True
+            color: 0.05, 0.05, 0.15, 1
+            size_hint_y: None
+            height: adaptive_dp(40)
+        
+        Label:
+            text: "Transaction history and charts will appear here"
+            font_size: adaptive_font(18) if not is_small_screen else adaptive_font(16)
+            color: 0.05, 0.05, 0.15, 0.8
+            halign: "center"
+            text_size: self.width, None
+
+<SavingsTab>:
+    name: 'savings_tab'
+    selected_plan_id: 0 # Переконайтеся, що ця властивість є у вашому Python класі SavingsTab!
+    
+    BoxLayout:
+        orientation: 'vertical'
+        padding: dp(15)
+        spacing: dp(15)
+        
+        # Загальний фон (білий)
+        canvas.before:
+            Color:
+                rgba: 1, 1, 1, 1
+            Rectangle:
+                pos: self.pos
+                size: self.size
+
+        # 1. БЛОК СТВОРЕННЯ НОВОГО ПЛАНУ
+        BoxLayout:
+            orientation: 'vertical'
+            size_hint_y: None
+            height: dp(180)
             spacing: dp(10)
             
+            Label:
+                text: '✨ Створити Новий План Заощаджень'
+                font_size: dp(18)
+                color: DARK_BURGUNDY
+                size_hint_y: None
+                height: dp(30)
+
+            # Поля вводу
+            GridLayout:
+                cols: 3
+                spacing: dp(10)
+                size_hint_y: None
+                height: dp(40)
+                
+                TextInput:
+                    id: plan_name_input
+                    hint_text: 'Назва плану...'
+                    multiline: False
+                    size_hint_x: 0.35
+                    height: dp(40)
+                    
+                TextInput:
+                    id: target_amount_input
+                    hint_text: 'Цільова сума ($)'
+                    input_type: 'number'
+                    multiline: False
+                    size_hint_x: 0.3
+                    height: dp(40)
+                
+                BoxLayout:
+                    size_hint_x: 0.35
+                    spacing: dp(5)
+                    TextInput:
+                        id: deadline_input
+                        hint_text: 'Дедлайн'
+                        multiline: False
+                        size_hint_x: 0.7
+                        height: dp(40)
+                    Button:
+                        text: '📅'
+                        size_hint_x: 0.3
+                        background_color: TURQUOISE
+                        on_press: root.show_calendar()
+
+            # Кнопка Створити
+            Button:
+                text: '🚀 Створити План'
+                size_hint_y: None
+                height: dp(45)
+                background_color: CREATION_BUTTON
+                on_press: root.create_savings_plan()
+
+        # Повідомлення про статус
+        Label:
+            id: savings_message
+            text: '🎯 Введіть дані та створіть план'
+            size_hint_y: None
+            height: dp(25)
+            color: DARK_BURGUNDY
+            text_size: self.size
+            halign: 'center'
+            valign: 'middle'
+        
+        # Візуальний роздільник
+        Widget:
+            size_hint_y: None
+            height: dp(1)
+            canvas:
+                Color:
+                    rgba: DARK_BURGUNDY[0], DARK_BURGUNDY[1], DARK_BURGUNDY[2], 0.3
+                Rectangle:
+                    pos: self.pos
+                    size: self.size
+
+        # 2. БЛОК ОПЕРАЦІЙ З ОБРАНИМ ПЛАНОМ
+        BoxLayout:
+            orientation: 'vertical'
+            size_hint_y: None
+            height: dp(130)
+            padding: dp(10)
+            spacing: dp(10)
+            
+            # Фон блоку операцій (світло-рожевий)
+            canvas.before:
+                Color:
+                    rgba: LIGHT_PINK[0], LIGHT_PINK[1], LIGHT_PINK[2], 0.7 
+                Rectangle:
+                    pos: self.pos
+                    size: self.size
+                    
+            Label:
+                id: selected_plan_label
+                text: f'✅ Обрано: {root.selected_plan_name}' if root.selected_plan_id > 0 else '👆 Оберіть план для операцій'
+                color: DARK_BURGUNDY if root.selected_plan_id > 0 else (0.5, 0.5, 0.5, 1)
+                font_size: dp(14)
+                size_hint_y: None
+                height: dp(20)
+            
+            # Поле вводу суми та основні кнопки
+            BoxLayout:
+                size_hint_y: None
+                height: dp(40)
+                spacing: dp(10)
+                
+                TextInput:
+                    id: savings_amount_input
+                    hint_text: 'Сума ($)'
+                    input_type: 'number'
+                    multiline: False
+                    size_hint_x: 0.4
+                    height: dp(40)
+                
+                Button:
+                    id: add_funds_btn
+                    text: '+ Додати'
+                    background_color: CREATION_BUTTON[0], CREATION_BUTTON[1]*0.8, CREATION_BUTTON[2]*0.8, 1
+                    size_hint_x: 0.3
+                    disabled: root.selected_plan_id == 0
+                    on_press: root.add_to_savings_plan()
+                
+                Button:
+                    id: withdraw_funds_btn
+                    text: '- Вилучити'
+                    background_color: (0.6, 0.6, 0.6, 1)
+                    size_hint_x: 0.3
+                    disabled: root.selected_plan_id == 0
+                    on_press: root.remove_from_savings_plan()
+            
+            # Кнопки редагування/видалення
+            BoxLayout:
+                size_hint_y: None
+                height: dp(40)
+                spacing: dp(10)
+                
+                Button:
+                    id: edit_plan_btn
+                    text: '✏️ Редагувати'
+                    background_color: TURQUOISE
+                    disabled: root.selected_plan_id == 0
+                    on_press: root.edit_savings_plan()
+                    
+                Button:
+                    id: delete_plan_btn
+                    text: '🗑️ Видалити'
+                    background_color: ERROR_RED
+                    disabled: root.selected_plan_id == 0
+                    on_press: root.delete_savings_plan()
+
+        # 3. БЛОК ВАШИХ АКТИВНИХ ПЛАНІВ (СПИСОК)
+        Label:
+            text: '💰 Ваші Цілі та Прогрес'
+            font_size: dp(18)
+            color: DARK_BURGUNDY
+            size_hint_y: None
+            height: dp(30)
+
+        ScrollView:
+            size_hint_y: 1
+            
+            GridLayout:
+                id: savings_container
+                cols: 1
+                size_hint_y: None
+                height: self.minimum_height
+                spacing: dp(10)
+                padding: dp(5)
+
+<AITab>:
+    name: "ai_tab"
+    canvas.before:
+        Color:
+            rgba: 0.95, 0.98, 1.0, 1
+        Rectangle:
+            pos: self.pos
+            size: self.size
+    
+    BoxLayout:
+        orientation: 'vertical'
+        padding: adaptive_padding(40)
+        spacing: adaptive_dp(20)
+        
+        LoginFormLogo:
+            height: adaptive_dp(120) if not is_small_screen else adaptive_dp(90)
+        
+        Label:
+            text: "🤖 AI Assistant"
+            font_size: adaptive_font(28) if not is_small_screen else adaptive_font(24)
+            bold: True
+            color: 0.05, 0.05, 0.15, 1
+            size_hint_y: None
+            height: adaptive_dp(40)
+        
+        Label:
+            text: "Smart financial advice and predictions"
+            font_size: adaptive_font(18) if not is_small_screen else adaptive_font(16)
+            color: 0.05, 0.05, 0.15, 0.8
+            halign: "center"
+            text_size: self.width, None
+
+<AccountTab>:
+    name: "account_tab"
+    canvas.before:
+        Color:
+            rgba: 0.95, 0.98, 1.0, 1
+        Rectangle:
+            pos: self.pos
+            size: self.size
+    
+    BoxLayout:
+        orientation: 'vertical'
+        padding: adaptive_padding(40)
+        spacing: adaptive_dp(20)
+        
+        LoginFormLogo:
+            height: adaptive_dp(120) if not is_small_screen else adaptive_dp(90)
+        
+        Label:
+            text: "👤 Account Settings"
+            font_size: adaptive_font(28) if not is_small_screen else adaptive_font(24)
+            bold: True
+            color: 0.05, 0.05, 0.15, 1
+            size_hint_y: None
+            height: adaptive_dp(40)
+        
+        Widget:
+        
+        BoxLayout:
+            orientation: 'vertical'
+            spacing: adaptive_dp(15)
+            size_hint_y: None
+            height: adaptive_dp(200) if not is_small_screen else adaptive_dp(160)
+            
+            Label:
+                id: username_label
+                text: "Username: "
+                font_size: adaptive_font(18) if not is_small_screen else adaptive_font(16)
+                color: 0.05, 0.05, 0.15, 1
+                size_hint_y: None
+                height: adaptive_dp(30)
+            
+            Label:
+                id: email_label
+                text: "Email: "
+                font_size: adaptive_font(18) if not is_small_screen else adaptive_font(16)
+                color: 0.05, 0.05, 0.15, 1
+                size_hint_y: None
+                height: adaptive_dp(30)
+            
+            Widget:
+            
             StyledButton:
-                text: "Login"
+                text: "Logout"
                 background_color: 1.0, 0.42, 0.42, 1
-                on_press: root.login_user()
+                height: adaptive_dp(60) if not is_small_screen else adaptive_dp(50)
+                on_press: root.logout()
 
-            StyledButton:
-                text: "Back"
-                background_color: 0.14, 0.76, 0.88, 1
-                color: 1, 1, 1, 1
-                on_press:
-                    root.manager.transition.direction = 'right'
-                    root.manager.current = "start_screen"
-
-# -----------------------
-# Dashboard
-# -----------------------
+# ГОЛОВНИЙ ДАШБОРД
 <DashboardScreen>:
     name: "dashboard_screen"
-    GradientBox:
-        color1: 1.0, 0.98, 0.98, 1
+    canvas.before:
+        Color:
+            rgba: 0.95, 0.98, 1.0, 1
+        Rectangle:
+            pos: self.pos
+            size: self.size
+    
+    BoxLayout:
         orientation: "vertical"
         
         ScreenManager:
             id: tab_manager
+            canvas.before:
+                Color:
+                    rgba: 0.95, 0.98, 1.0, 1
+                Rectangle:
+                    pos: self.pos
+                    size: self.size
             
-            Screen:
-                name: "home_tab"
-                BoxLayout:
-                    orientation: "vertical"
-                    padding: dp(40)
-                    spacing: dp(20)
-                    
-                    LoginFormLogo:
-                        size_hint_y: None
-                        height: dp(120)
-                    
-                    Label:
-                        id: welcome_label
-                        text: "Welcome!"
-                        font_size: dp(28)
-                        bold: True
-                        color: 0.05, 0.05, 0.15, 1
-                        size_hint_y: None
-                        height: dp(40)
-
-                    Label:
-                        id: balance_label
-                        text: "Balance: $0"
-                        font_size: dp(24)
-                        color: 0.05, 0.05, 0.15, 1
-                        size_hint_y: None
-                        height: dp(35)
-
-                    BoxLayout:
-                        spacing: dp(15)
-                        size_hint_y: None
-                        height: dp(50)
-                        StyledTextInput:
-                            id: amount_input
-                            hint_text: "Enter amount"
-                            input_filter: "float"
-
-                        StyledButton:
-                            text: "Add"
-                            background_color: 1.0, 0.42, 0.42, 1
-                            size_hint_x: 0.4
-                            on_press: root.add_money()
-
-                        StyledButton:
-                            text: "Remove"
-                            background_color: 0.14, 0.76, 0.88, 1
-                            size_hint_x: 0.4
-                            on_press: root.remove_money()
-
-                    Widget:
-
-            Screen:
-                name: "analytics_tab"
-                GradientBox:
-                    color1: 1.0, 0.98, 0.98, 1
-                    orientation: 'vertical'
-                    padding: dp(40)
-                    spacing: dp(20)
-                    
-                    LoginFormLogo:
-                        size_hint_y: None
-                        height: dp(120)
-                    
-                    Label:
-                        text: "📊 Analytics"
-                        font_size: dp(28)
-                        bold: True
-                        color: 0.05, 0.05, 0.15, 1
-                        size_hint_y: None
-                        height: dp(40)
-                    
-                    Label:
-                        text: "Transaction history and charts will appear here"
-                        font_size: dp(18)
-                        color: 0.05, 0.05, 0.15, 0.8
-                        halign: "center"
-                        text_size: self.width, None
-
-            Screen:
-                name: "savings_tab"
-                BoxLayout:
-                    orientation: 'vertical'
-                    padding: dp(15)
-                    spacing: dp(10)
-                    
-                    # Header Section
-                    BoxLayout:
-                        orientation: 'vertical'
-                        size_hint_y: None
-                        height: dp(140)
-                        spacing: dp(5)
-                        
-                        LoginFormLogo:
-                            size_hint_y: None
-                            height: dp(80)
-                        
-                        Label:
-                            text: "💰 Savings Plans"
-                            font_size: dp(28)
-                            bold: True
-                            color: 0.05, 0.05, 0.15, 1
-                            size_hint_y: None
-                            height: dp(40)
-                    
-                    # Create New Plan Section
-                    BoxLayout:
-                        orientation: 'vertical'
-                        size_hint_y: None
-                        height: dp(210)
-                        padding: [dp(10), dp(5)]
-                        spacing: dp(8)
-                        canvas.before:
-                            Color:
-                                rgba: 0.95, 0.95, 0.95, 1
-                            RoundedRectangle:
-                                pos: self.pos
-                                size: self.size
-                                radius: [dp(15),]
-                        
-                        Label:
-                            text: "Create New Savings Plan"
-                            font_size: dp(18)
-                            bold: True
-                            color: 0.05, 0.05, 0.15, 1
-                            size_hint_y: None
-                            height: dp(25)
-                        
-                        StyledTextInput:
-                            id: plan_name_input
-                            hint_text: "Plan Name"
-                            size_hint_y: None
-                            height: dp(45)
-                        
-                        BoxLayout:
-                            size_hint_y: None
-                            height: dp(45)
-                            spacing: dp(8)
-                            
-                            StyledTextInput:
-                                id: target_amount_input
-                                hint_text: "Target Amount ($)"
-                                input_filter: "float"
-                                size_hint_x: 0.6
-                            
-                            StyledTextInput:
-                                id: deadline_input
-                                hint_text: "Deadline"
-                                size_hint_x: 0.4
-                        
-                        StyledButton:
-                            text: "Create Savings Plan"
-                            background_color: 0.14, 0.76, 0.88, 1
-                            size_hint_y: None
-                            height: dp(45)
-                            on_press: root.create_savings_plan()
-                    
-                    # Add Money Section
-                    BoxLayout:
-                        orientation: 'vertical'
-                        size_hint_y: None
-                        height: dp(100)
-                        padding: [dp(10), dp(5)]
-                        spacing: dp(8)
-                        canvas.before:
-                            Color:
-                                rgba: 0.95, 0.95, 0.95, 1
-                            RoundedRectangle:
-                                pos: self.pos
-                                size: self.size
-                                radius: [dp(15),]
-                        
-                        Label:
-                            text: "Add Money to Plan"
-                            font_size: dp(16)
-                            bold: True
-                            color: 0.05, 0.05, 0.15, 1
-                            size_hint_y: None
-                            height: dp(25)
-                        
-                        BoxLayout:
-                            orientation: 'horizontal'
-                            size_hint_y: None
-                            height: dp(45)
-                            spacing: dp(8)
-                            
-                            StyledTextInput:
-                                id: savings_amount_input
-                                hint_text: "Amount to add ($)"
-                                input_filter: "float"
-                                size_hint_x: 0.6
-                            
-                            StyledButton:
-                                text: "Add to Plan"
-                                background_color: 1.0, 0.42, 0.42, 1
-                                size_hint_x: 0.4
-                                on_press: root.add_to_savings_plan("selected")
-                    
-                    # Message Label
-                    Label:
-                        id: savings_message
-                        text: ""
-                        color: 1.0, 0.42, 0.42, 1
-                        size_hint_y: None
-                        height: dp(30)
-                        text_size: self.width, None
-                        halign: 'center'
-                    
-                    # Plans List with ScrollView
-                    Label:
-                        text: "Your Savings Plans"
-                        font_size: dp(18)
-                        bold: True
-                        color: 0.05, 0.05, 0.15, 1
-                        size_hint_y: None
-                        height: dp(30)
-                    
-                    ScrollView:
-                        id: savings_scroll
-                        size_hint_y: 1
-                        do_scroll_x: False
-                        do_scroll_y: True
-                        bar_width: dp(10)
-                        bar_color: 0.14, 0.76, 0.88, 0.7
-                        scroll_type: ['bars', 'content']
-                        
-                        BoxLayout:
-                            id: savings_container
-                            orientation: 'vertical'
-                            spacing: dp(10)
-                            size_hint_y: None
-                            padding: [dp(5), dp(5)]
-                            
-                            # Savings plans will be added here dynamically
-
-            Screen:
-                name: "ai_tab"
-                GradientBox:
-                    color1: 1.0, 0.98, 0.98, 1
-                    orientation: 'vertical'
-                    padding: dp(40)
-                    spacing: dp(20)
-                    
-                    LoginFormLogo:
-                        size_hint_y: None
-                        height: dp(120)
-                    
-                    Label:
-                        text: "🤖 AI Assistant"
-                        font_size: dp(28)
-                        bold: True
-                        color: 0.05, 0.05, 0.15, 1
-                        size_hint_y: None
-                        height: dp(40)
-                    
-                    Label:
-                        text: "Smart financial advice and predictions"
-                        font_size: dp(18)
-                        color: 0.05, 0.05, 0.15, 0.8
-                        halign: "center"
-                        text_size: self.width, None
-
-            Screen:
-                name: "account_tab"
-                GradientBox:
-                    color1: 1.0, 0.98, 0.98, 1
-                    orientation: 'vertical'
-                    padding: dp(40)
-                    spacing: dp(20)
-                    
-                    LoginFormLogo:
-                        size_hint_y: None
-                        height: dp(120)
-                    
-                    Label:
-                        text: "👤 Account Settings"
-                        font_size: dp(28)
-                        bold: True
-                        color: 0.05, 0.05, 0.15, 1
-                        size_hint_y: None
-                        height: dp(40)
-                    
-                    Widget:
-                    
-                    BoxLayout:
-                        orientation: 'vertical'
-                        spacing: dp(15)
-                        size_hint_y: None
-                        height: dp(200)
-                        
-                        Label:
-                            id: username_label
-                            text: "Username: "
-                            font_size: dp(18)
-                            color: 0.05, 0.05, 0.15, 1
-                            size_hint_y: None
-                            height: dp(30)
-                        
-                        Label:
-                            id: email_label
-                            text: "Email: "
-                            font_size: dp(18)
-                            color: 0.05, 0.05, 0.15, 1
-                            size_hint_y: None
-                            height: dp(30)
-                        
-                        Widget:
-                        
-                        StyledButton:
-                            text: "Logout"
-                            background_color: 1.0, 0.42, 0.42, 1
-                            size_hint_y: None
-                            height: dp(55)
-                            on_press: root.logout()
+            HomeTab:
+            AnalyticsTab:
+            SavingsTab:
+            AITab:
+            AccountTab:
 
         BoxLayout:
             size_hint_y: None
-            height: dp(70)
-            padding: dp(10)
-            spacing: dp(10)
+            height: adaptive_dp(70) if not is_small_screen else adaptive_dp(60)
+            padding: adaptive_dp(10)
+            spacing: adaptive_dp(10)
             canvas.before:
                 Color:
                     rgba: 0.14, 0.76, 0.88, 1
                 RoundedRectangle:
                     pos: self.pos
                     size: self.size
-                    radius: [dp(25), dp(25), 0, 0]
-
+                    radius: [adaptive_dp(25), adaptive_dp(25), 0, 0]
+# У кінці DashboardScreen в KV файлі
             BottomMenuItem:
-                tab_name: "home_tab"
+                tab_name: "home"
                 icon_source: "icons/home.png"
 
             BottomMenuItem:
-                tab_name: "analytics_tab"
+                tab_name: "analytics"
                 icon_source: "icons/analytics.png"
 
             BottomMenuItem:
-                tab_name: "savings_tab"
+                tab_name: "savings"
                 icon_source: "icons/savings.png"
 
             BottomMenuItem:
-                tab_name: "ai_tab"
+                tab_name: "ai"
                 icon_source: "icons/ai.png"
 
             BottomMenuItem:
-                tab_name: "account_tab"
+                tab_name: "account"
                 icon_source: "icons/account.png"

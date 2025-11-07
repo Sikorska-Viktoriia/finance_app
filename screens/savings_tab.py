@@ -1,0 +1,764 @@
+from datetime import datetime, timedelta
+from kivy.uix.screenmanager import Screen
+from kivy.uix.label import Label
+from kivy.uix.popup import Popup
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.textinput import TextInput
+from kivy.uix.button import Button
+from kivy.uix.gridlayout import GridLayout
+from kivy.metrics import dp
+from kivy.app import App
+from kivy.clock import Clock
+from db_manager import cursor, conn, log_transaction, log_savings_transaction
+from widgets import SavingsPlanItem
+
+class DatePickerPopup(Popup):
+    """Custom date picker popup."""
+    
+    def __init__(self, callback, **kwargs):
+        super().__init__(**kwargs)
+        self.callback = callback
+        self.selected_date = datetime.now().date()
+        self.create_widgets()
+    
+    def create_widgets(self):
+        content = BoxLayout(orientation='vertical', spacing=dp(10), padding=dp(20))
+        
+        # Current date display
+        self.date_label = Label(
+            text=self.selected_date.strftime('%Y-%m-%d'),
+            font_size=dp(20),
+            size_hint_y=None,
+            height=dp(40)
+        )
+        content.add_widget(self.date_label)
+        
+        # Date navigation
+        nav_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(50))
+        
+        prev_btn = Button(text='◀', size_hint_x=0.2)
+        prev_btn.bind(on_press=self.prev_day)
+        nav_layout.add_widget(prev_btn)
+        
+        today_btn = Button(text='Сьогодні', size_hint_x=0.6)
+        today_btn.bind(on_press=self.set_today)
+        nav_layout.add_widget(today_btn)
+        
+        next_btn = Button(text='▶', size_hint_x=0.2)
+        next_btn.bind(on_press=self.next_day)
+        nav_layout.add_widget(next_btn)
+        
+        content.add_widget(nav_layout)
+        
+        # Quick selection buttons
+        quick_layout = GridLayout(cols=3, spacing=dp(5), size_hint_y=None, height=dp(100))
+        
+        days_7 = Button(text='+7 днів')
+        days_7.bind(on_press=lambda x: self.add_days(7))
+        quick_layout.add_widget(days_7)
+        
+        days_30 = Button(text='+30 днів')
+        days_30.bind(on_press=lambda x: self.add_days(30))
+        quick_layout.add_widget(days_30)
+        
+        days_90 = Button(text='+90 днів')
+        days_90.bind(on_press=lambda x: self.add_days(90))
+        quick_layout.add_widget(days_90)
+        
+        month_1 = Button(text='+1 місяць')
+        month_1.bind(on_press=lambda x: self.add_months(1))
+        quick_layout.add_widget(month_1)
+        
+        month_3 = Button(text='+3 місяці')
+        month_3.bind(on_press=lambda x: self.add_months(3))
+        quick_layout.add_widget(month_3)
+        
+        month_6 = Button(text='+6 місяців')
+        month_6.bind(on_press=lambda x: self.add_months(6))
+        quick_layout.add_widget(month_6)
+        
+        content.add_widget(quick_layout)
+        
+        # Action buttons
+        btn_layout = BoxLayout(orientation='horizontal', spacing=dp(10), size_hint_y=None, height=dp(50))
+        
+        select_btn = Button(text='Обрати', background_color=(0.9, 0.3, 0.5, 1))
+        select_btn.bind(on_press=self.select_date)
+        btn_layout.add_widget(select_btn)
+        
+        cancel_btn = Button(text='Скасувати', background_color=(0.14, 0.76, 0.88, 1))
+        cancel_btn.bind(on_press=lambda x: self.dismiss())
+        btn_layout.add_widget(cancel_btn)
+        
+        content.add_widget(btn_layout)
+        
+        self.content = content
+    
+    def prev_day(self, instance):
+        self.selected_date -= timedelta(days=1)
+        self.update_display()
+    
+    def next_day(self, instance):
+        self.selected_date += timedelta(days=1)
+        self.update_display()
+    
+    def set_today(self, instance):
+        self.selected_date = datetime.now().date()
+        self.update_display()
+    
+    def add_days(self, days):
+        self.selected_date += timedelta(days=days)
+        self.update_display()
+    
+    def add_months(self, months):
+        # Simple month addition
+        year = self.selected_date.year
+        month = self.selected_date.month + months
+        day = self.selected_date.day
+        
+        while month > 12:
+            month -= 12
+            year += 1
+        
+        # Handle day overflow (simple approach)
+        try:
+            self.selected_date = self.selected_date.replace(year=year, month=month, day=min(day, 28))
+        except ValueError:
+            self.selected_date = self.selected_date.replace(year=year, month=month, day=28)
+        
+        self.update_display()
+    
+    def update_display(self):
+        self.date_label.text = self.selected_date.strftime('%Y-%m-%d')
+    
+    def select_date(self, instance):
+        self.callback(self.selected_date.strftime('%Y-%m-%d'))
+        self.dismiss()
+
+class SavingsTab(Screen):
+    """Savings plans tab."""
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.selected_plan_id = None
+        self.selected_plan_name = ""
+    
+    def get_app(self):
+        """Safe way to get app instance."""
+        return App.get_running_app()
+    
+    def on_enter(self):
+        """Called when entering the tab."""
+        Clock.schedule_once(lambda dt: self.update_savings_tab(), 0.1)
+        self.clear_inputs()
+    
+    def clear_inputs(self):
+        """Clear all input fields."""
+        if hasattr(self, 'ids'):
+            if 'plan_name_input' in self.ids:
+                self.ids.plan_name_input.text = ""
+            if 'target_amount_input' in self.ids:
+                self.ids.target_amount_input.text = ""
+            if 'deadline_input' in self.ids:
+                self.ids.deadline_input.text = ""
+            if 'savings_amount_input' in self.ids:
+                self.ids.savings_amount_input.text = ""
+            if 'savings_message' in self.ids:
+                self.ids.savings_message.text = ""
+        
+        self.selected_plan_id = None
+        self.selected_plan_name = ""
+        self.update_operation_buttons()
+    
+    def update_operation_buttons(self):
+        """Update operation buttons state based on selection."""
+        if not hasattr(self, 'ids'):
+            return
+            
+        has_selection = self.selected_plan_id is not None
+        
+        if 'add_funds_btn' in self.ids:
+            self.ids.add_funds_btn.disabled = not has_selection
+        if 'withdraw_funds_btn' in self.ids:
+            self.ids.withdraw_funds_btn.disabled = not has_selection
+        if 'edit_plan_btn' in self.ids:
+            self.ids.edit_plan_btn.disabled = not has_selection
+        if 'delete_plan_btn' in self.ids:
+            self.ids.delete_plan_btn.disabled = not has_selection
+        
+        if 'selected_plan_label' in self.ids:
+            if has_selection:
+                self.ids.selected_plan_label.text = f"💰 Обрано: {self.selected_plan_name}"
+                self.ids.selected_plan_label.color = (0.9, 0.3, 0.5, 1)
+            else:
+                self.ids.selected_plan_label.text = "👆 Оберіть план для операцій"
+                self.ids.selected_plan_label.color = (0.5, 0.5, 0.5, 1)
+    
+    def show_calendar(self):
+        """Show custom date picker popup."""
+        def set_date(date_str):
+            self.ids.deadline_input.text = date_str
+        
+        popup = DatePickerPopup(
+            callback=set_date,
+            title='Оберіть дату дедлайну',
+            size_hint=(0.8, 0.6)
+        )
+        popup.open()
+    
+    def update_savings_tab(self):
+        """Refresh the list of savings plans."""
+        if 'savings_container' not in self.ids:
+            Clock.schedule_once(lambda dt: self.update_savings_tab(), 0.1)
+            return
+
+        savings_container = self.ids.savings_container
+        savings_container.clear_widgets()
+        
+        try:
+            app = self.get_app()
+            if not hasattr(app, 'current_user_id') or not app.current_user_id:
+                no_plans_label = Label(
+                    text="Будь ласка, увійдіть в систему",
+                    font_size=dp(16),
+                    color=(0.5, 0.5, 0.5, 1),
+                    halign="center"
+                )
+                savings_container.add_widget(no_plans_label)
+                return
+            
+            cursor.execute(
+                "SELECT id, name, target_amount, current_amount, deadline, status FROM savings_plans WHERE user_id=? ORDER BY created_at DESC",
+                (app.current_user_id,)
+            )
+            plans = cursor.fetchall()
+            
+            if not plans:
+                no_plans_label = Label(
+                    text="🎯 Ще немає планів заощаджень\n\nСтворіть свій перший план заощаджень!",
+                    font_size=dp(18),
+                    color=(0.5, 0.5, 0.5, 1),
+                    halign="center",
+                    text_size=(dp(300), None)
+                )
+                savings_container.add_widget(no_plans_label)
+                return
+            
+            for plan in plans:
+                plan_id, name, target, current, deadline, status = plan
+                
+                progress = (current / target * 100) if target > 0 else 0
+                
+                days_left = 0
+                if deadline:
+                    try:
+                        deadline_date = datetime.strptime(deadline, '%Y-%m-%d').date()
+                        today = datetime.now().date()
+                        days_left = max(0, (deadline_date - today).days)
+                    except ValueError:
+                        days_left = 0
+                
+                plan_item = SavingsPlanItem()
+                plan_item.plan_name = name
+                plan_item.current_amount = current
+                plan_item.target_amount = target
+                plan_item.progress = progress
+                plan_item.days_left = days_left
+                plan_item.status = status
+                plan_item.plan_id = plan_id
+                plan_item.on_plan_select = self.on_plan_select
+                
+                savings_container.add_widget(plan_item)
+                
+        except Exception as e:
+            print(f"Error loading savings plans: {e}")
+            error_label = Label(
+                text="❌ Помилка завантаження планів",
+                font_size=dp(16),
+                color=(0.8, 0.2, 0.2, 1),
+                halign="center"
+            )
+            savings_container.add_widget(error_label)
+    
+    def on_plan_select(self, plan_id, plan_name):
+        """Handle plan selection."""
+        self.selected_plan_id = plan_id
+        self.selected_plan_name = plan_name
+        self.update_savings_tab()
+        self.update_operation_buttons()
+        
+        # Оновлюємо повідомлення
+        if 'savings_message' in self.ids:
+            self.ids.savings_message.text = f"✅ Обрано план: {plan_name}"
+            self.ids.savings_message.color = (0.2, 0.6, 0.2, 1)
+    
+    def create_savings_plan(self):
+        """Create a new savings plan."""
+        if not hasattr(self, 'ids'):
+            return
+            
+        plan_name = self.ids.plan_name_input.text.strip()
+        target_text = self.ids.target_amount_input.text.strip()
+        deadline = self.ids.deadline_input.text.strip()
+        
+        if not plan_name:
+            self.ids.savings_message.text = "❌ Будь ласка, введіть назву плану"
+            self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
+            return
+        
+        try:
+            target_amount = float(target_text)
+            if target_amount <= 0:
+                self.ids.savings_message.text = "❌ Цільова сума має бути додатною"
+                self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
+                return
+        except ValueError:
+            self.ids.savings_message.text = "❌ Введіть коректну цільову суму"
+            self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
+            return
+        
+        if deadline:
+            try:
+                datetime.strptime(deadline, '%Y-%m-%d')
+            except ValueError:
+                self.ids.savings_message.text = "❌ Невірний формат дати. Використовуйте РРРР-ММ-ДД"
+                self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
+                return
+        
+        try:
+            app = self.get_app()
+            cursor.execute(
+                "INSERT INTO savings_plans (user_id, name, target_amount, deadline) VALUES (?, ?, ?, ?)",
+                (app.current_user_id, plan_name, target_amount, deadline if deadline else None)
+            )
+            plan_id = cursor.lastrowid
+            
+            log_savings_transaction(
+                cursor, conn,
+                app.current_user_id,
+                plan_id,
+                0,
+                "plan_created",
+                f"Створено план заощаджень: {plan_name}"
+            )
+            
+            conn.commit()
+            
+            self.clear_inputs()
+            self.ids.savings_message.text = f"✅ План '{plan_name}' успішно створено!"
+            self.ids.savings_message.color = (0.2, 0.6, 0.2, 1)
+            self.update_savings_tab()
+            
+        except Exception as e:
+            print(f"Error creating plan: {e}")
+            self.ids.savings_message.text = f"❌ Помилка створення плану: {str(e)}"
+            self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
+    
+    def add_to_savings_plan(self):
+        """Add money to selected savings plan."""
+        if not self.selected_plan_id:
+            self.ids.savings_message.text = "❌ Будь ласка, оберіть план"
+            self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
+            return
+            
+        try:
+            amount_text = self.ids.savings_amount_input.text.strip()
+            if not amount_text:
+                self.ids.savings_message.text = "❌ Будь ласка, введіть суму для додавання"
+                self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
+                return
+            
+            amount = float(amount_text)
+            if amount <= 0:
+                self.ids.savings_message.text = "❌ Сума має бути додатною"
+                self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
+                return
+            
+            app = self.get_app()
+            if amount > app.balance:
+                self.ids.savings_message.text = f"❌ Недостатньо коштів у гаманці. Доступно: ${app.balance:.2f}"
+                self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
+                return
+            
+            cursor.execute(
+                "SELECT current_amount, target_amount FROM savings_plans WHERE id = ? AND user_id = ?",
+                (self.selected_plan_id, app.current_user_id)
+            )
+            plan = cursor.fetchone()
+            
+            if not plan:
+                self.ids.savings_message.text = "❌ План не знайдено"
+                self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
+                return
+            
+            current_amount, target_amount = plan
+            
+            if current_amount + amount > target_amount:
+                max_amount = target_amount - current_amount
+                self.ids.savings_message.text = f"❌ Сума перевищує ціль плану. Максимум: ${max_amount:.2f}"
+                self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
+                return
+            
+            # Update wallet balance
+            app.balance -= amount
+            cursor.execute("UPDATE wallets SET balance=? WHERE user_id=?", 
+                         (app.balance, app.current_user_id))
+            
+            # Update savings plan
+            cursor.execute(
+                "UPDATE savings_plans SET current_amount = current_amount + ? WHERE id = ?",
+                (amount, self.selected_plan_id)
+            )
+            
+            log_transaction(
+                cursor, conn,
+                app.current_user_id, 
+                "savings_transfer", 
+                amount, 
+                f"Переведено до плану: {self.selected_plan_name}"
+            )
+            
+            log_savings_transaction(
+                cursor, conn,
+                app.current_user_id,
+                self.selected_plan_id,
+                amount,
+                "deposit",
+                f"Додано до плану заощаджень"
+            )
+            
+            conn.commit()
+            
+            self.ids.savings_amount_input.text = ""
+            self.ids.savings_message.text = f"✅ Успішно додано ${amount:.2f} до {self.selected_plan_name}"
+            self.ids.savings_message.color = (0.2, 0.6, 0.2, 1)
+            self.update_savings_tab()
+            
+        except ValueError:
+            self.ids.savings_message.text = "❌ Введіть коректну суму"
+            self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
+        except Exception as e:
+            self.ids.savings_message.text = f"❌ Помилка: {str(e)}"
+            self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
+
+    def remove_from_savings_plan(self):
+        """Remove money from selected savings plan."""
+        if not self.selected_plan_id:
+            self.ids.savings_message.text = "❌ Будь ласка, оберіть план"
+            self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
+            return
+            
+        try:
+            amount_text = self.ids.savings_amount_input.text.strip()
+            if not amount_text:
+                self.ids.savings_message.text = "❌ Будь ласка, введіть суму для вилучення"
+                self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
+                return
+            
+            amount = float(amount_text)
+            if amount <= 0:
+                self.ids.savings_message.text = "❌ Сума має бути додатною"
+                self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
+                return
+            
+            app = self.get_app()
+            cursor.execute(
+                "SELECT current_amount FROM savings_plans WHERE id = ? AND user_id = ?",
+                (self.selected_plan_id, app.current_user_id)
+            )
+            plan = cursor.fetchone()
+            
+            if not plan:
+                self.ids.savings_message.text = "❌ План не знайдено"
+                self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
+                return
+            
+            current_amount = plan[0]
+            
+            if amount > current_amount:
+                self.ids.savings_message.text = f"❌ Недостатньо коштів у плані. Доступно: ${current_amount:.2f}"
+                self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
+                return
+            
+            # Update wallet balance
+            app.balance += amount
+            cursor.execute("UPDATE wallets SET balance=? WHERE user_id=?", 
+                        (app.balance, app.current_user_id))
+            
+            # Update savings plan
+            cursor.execute(
+                "UPDATE savings_plans SET current_amount = current_amount - ? WHERE id = ?",
+                (amount, self.selected_plan_id)
+            )
+            
+            log_transaction(
+                cursor, conn,
+                app.current_user_id, 
+                "savings_return", 
+                amount, 
+                f"Повернено з плану: {self.selected_plan_name}"
+            )
+            
+            log_savings_transaction(
+                cursor, conn,
+                app.current_user_id,
+                self.selected_plan_id,
+                amount,
+                "withdrawal",
+                f"Вилучено з плану заощаджень"
+            )
+            
+            conn.commit()
+            
+            self.ids.savings_amount_input.text = ""
+            self.ids.savings_message.text = f"✅ Успішно вилучено ${amount:.2f} з {self.selected_plan_name}"
+            self.ids.savings_message.color = (0.2, 0.6, 0.2, 1)
+            self.update_savings_tab()
+            
+        except ValueError:
+            self.ids.savings_message.text = "❌ Введіть коректну суму"
+            self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
+        except Exception as e:
+            self.ids.savings_message.text = f"❌ Помилка: {str(e)}"
+            self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
+
+    def edit_savings_plan(self):
+        """Edit selected savings plan."""
+        if not self.selected_plan_id:
+            self.ids.savings_message.text = "❌ Будь ласка, оберіть план для редагування"
+            self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
+            return
+        
+        # Create edit popup
+        content = BoxLayout(orientation='vertical', spacing=dp(10), padding=dp(20))
+        
+        # Get current plan data
+        cursor.execute(
+            "SELECT name, target_amount, deadline FROM savings_plans WHERE id = ?",
+            (self.selected_plan_id,)
+        )
+        plan_data = cursor.fetchone()
+        
+        if not plan_data:
+            return
+        
+        current_name, current_target, current_deadline = plan_data
+        
+        # Name input
+        name_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(40))
+        name_layout.add_widget(Label(text='Назва:', size_hint_x=0.4, color=(0, 0, 0, 1)))
+        name_input = TextInput(
+            text=current_name, 
+            multiline=False,
+            size_hint_x=0.6,
+            background_color=(1, 1, 1, 1),
+            foreground_color=(0, 0, 0, 1)
+        )
+        name_layout.add_widget(name_input)
+        content.add_widget(name_layout)
+        
+        # Target amount input
+        target_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(40))
+        target_layout.add_widget(Label(text='Цільова сума:', size_hint_x=0.4, color=(0, 0, 0, 1)))
+        target_input = TextInput(
+            text=str(current_target), 
+            multiline=False,
+            size_hint_x=0.6,
+            background_color=(1, 1, 1, 1),
+            foreground_color=(0, 0, 0, 1)
+        )
+        target_layout.add_widget(target_input)
+        content.add_widget(target_layout)
+        
+        # Deadline input with calendar button
+        deadline_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(40))
+        deadline_layout.add_widget(Label(text='Дедлайн:', size_hint_x=0.4, color=(0, 0, 0, 1)))
+        
+        deadline_input = TextInput(
+            text=current_deadline if current_deadline else "", 
+            multiline=False,
+            hint_text="РРРР-ММ-ДД",
+            size_hint_x=0.4,
+            background_color=(1, 1, 1, 1),
+            foreground_color=(0, 0, 0, 1)
+        )
+        deadline_layout.add_widget(deadline_input)
+        
+        calendar_btn = Button(
+            text='📅',
+            size_hint_x=0.2,
+            background_color=(0.14, 0.76, 0.88, 1)
+        )
+        
+        def show_calendar(_):
+            def set_date(date_str):
+                deadline_input.text = date_str
+            popup = DatePickerPopup(
+                callback=set_date,
+                title='Оберіть дату дедлайну',
+                size_hint=(0.8, 0.6)
+            )
+            popup.open()
+            
+        calendar_btn.bind(on_press=show_calendar)
+        deadline_layout.add_widget(calendar_btn)
+        
+        content.add_widget(deadline_layout)
+        
+        # Buttons
+        btn_layout = BoxLayout(orientation='horizontal', spacing=dp(10), size_hint_y=None, height=dp(50))
+        
+        def save_plan(_):
+            try:
+                new_name = name_input.text.strip()
+                new_target = float(target_input.text.strip())
+                new_deadline = deadline_input.text.strip()
+                
+                if not new_name:
+                    self.ids.savings_message.text = "❌ Введіть назву плану"
+                    return
+                
+                if new_target <= 0:
+                    self.ids.savings_message.text = "❌ Цільова сума має бути додатною"
+                    return
+                
+                if new_deadline:
+                    try:
+                        datetime.strptime(new_deadline, '%Y-%m-%d')
+                    except ValueError:
+                        self.ids.savings_message.text = "❌ Невірний формат дати"
+                        return
+                
+                cursor.execute(
+                    "UPDATE savings_plans SET name=?, target_amount=?, deadline=? WHERE id=?",
+                    (new_name, new_target, new_deadline if new_deadline else None, self.selected_plan_id)
+                )
+                
+                app = self.get_app()
+                log_savings_transaction(
+                    cursor, conn,
+                    app.current_user_id,
+                    self.selected_plan_id,
+                    0,
+                    "plan_updated",
+                    f"Оновлено план заощаджень"
+                )
+                
+                conn.commit()
+                
+                self.selected_plan_name = new_name
+                popup.dismiss()
+                self.update_savings_tab()
+                self.update_operation_buttons()
+                self.ids.savings_message.text = "✅ План успішно оновлено!"
+                self.ids.savings_message.color = (0.2, 0.6, 0.2, 1)
+                
+            except ValueError:
+                self.ids.savings_message.text = "❌ Введіть коректну цільову суму"
+            except Exception as e:
+                print(f"Error updating plan: {e}")
+                self.ids.savings_message.text = f"❌ Помилка оновлення: {str(e)}"
+        
+        save_btn = Button(text='💾 Зберегти', background_color=(0.9, 0.3, 0.5, 1))
+        save_btn.bind(on_press=save_plan)
+        btn_layout.add_widget(save_btn)
+        
+        cancel_btn = Button(text='❌ Скасувати', background_color=(0.14, 0.76, 0.88, 1))
+        cancel_btn.bind(on_press=lambda x: popup.dismiss())
+        btn_layout.add_widget(cancel_btn)
+        
+        content.add_widget(btn_layout)
+        
+        popup = Popup(
+            title='✏️ Редагування плану заощаджень',
+            content=content,
+            size_hint=(0.8, 0.6),
+            background_color=(0.95, 0.95, 1, 1)
+        )
+        popup.open()
+
+    def delete_savings_plan(self):
+        """Delete selected savings plan with confirmation."""
+        if not self.selected_plan_id:
+            self.ids.savings_message.text = "❌ Будь ласка, оберіть план для видалення"
+            self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
+            return
+        
+        # Create confirmation popup
+        content = BoxLayout(orientation='vertical', spacing=dp(10), padding=dp(20))
+        
+        cursor.execute(
+            "SELECT current_amount FROM savings_plans WHERE id = ?",
+            (self.selected_plan_id,)
+        )
+        result = cursor.fetchone()
+        current_amount = result[0] if result else 0
+        
+        warning_text = f"Ви дійсно хочете видалити план '{self.selected_plan_name}'?"
+        if current_amount > 0:
+            warning_text += f"\n\nУвага: у плані є ${current_amount:.2f}. Ці кошти будуть повернуті на ваш основний рахунок."
+        
+        content.add_widget(Label(text=warning_text, text_size=(dp(300), None), color=(0, 0, 0, 1)))
+        
+        btn_layout = BoxLayout(orientation='horizontal', spacing=dp(10), size_hint_y=None, height=dp(50))
+        
+        def confirm_delete(_):
+            try:
+                app = self.get_app()
+                
+                # Return money to wallet if any
+                if current_amount > 0:
+                    app.balance += current_amount
+                    cursor.execute("UPDATE wallets SET balance=? WHERE user_id=?", 
+                                (app.balance, app.current_user_id))
+                    
+                    log_transaction(
+                        cursor, conn,
+                        app.current_user_id, 
+                        "savings_return", 
+                        current_amount, 
+                        f"Повернено при видаленні плану: {self.selected_plan_name}"
+                    )
+                
+                # Delete the plan
+                cursor.execute("DELETE FROM savings_plans WHERE id=?", (self.selected_plan_id,))
+                
+                log_savings_transaction(
+                    cursor, conn,
+                    app.current_user_id,
+                    self.selected_plan_id,
+                    current_amount,
+                    "plan_deleted",
+                    f"Видалено план заощаджень"
+                )
+                
+                conn.commit()
+                
+                popup.dismiss()
+                self.clear_inputs()
+                self.update_savings_tab()
+                self.ids.savings_message.text = "✅ План успішно видалено!"
+                self.ids.savings_message.color = (0.2, 0.6, 0.2, 1)
+                
+            except Exception as e:
+                print(f"Error deleting plan: {e}")
+                self.ids.savings_message.text = f"❌ Помилка видалення: {str(e)}"
+                self.ids.savings_message.color = (0.8, 0.2, 0.2, 1)
+        
+        delete_btn = Button(text='🗑️ Видалити', background_color=(0.8, 0.2, 0.2, 1))
+        delete_btn.bind(on_press=confirm_delete)
+        btn_layout.add_widget(delete_btn)
+        
+        cancel_btn = Button(text='❌ Скасувати', background_color=(0.14, 0.76, 0.88, 1))
+        cancel_btn.bind(on_press=lambda x: popup.dismiss())
+        btn_layout.add_widget(cancel_btn)
+        
+        content.add_widget(btn_layout)
+        
+        popup = Popup(
+            title='⚠️ Підтвердження видалення',
+            content=content,
+            size_hint=(0.8, 0.5),
+            background_color=(0.95, 0.95, 1, 1)
+        )
+        popup.open()
