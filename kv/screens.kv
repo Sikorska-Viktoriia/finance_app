@@ -258,7 +258,7 @@
                 StyledButton:
                     text: "Створити"
                     background_color: SUCCESS_GREEN
-                    on_press: app.root.get_screen('dashboard_screen').ids.tab_manager.get_screen('home_tab').create_card_from_modal(card_name_input.text, card_number_input.text, bank_spinner.text)
+                    on_press: root.parent.parent.create_card_from_modal(card_name_input.text, card_number_input.text, bank_spinner.text)
 
 <WhitePopup>:
     background_color: 1, 1, 1, 1
@@ -1203,10 +1203,20 @@
                     size: self.size
             
             HomeTab:
+                name: "home"  # ДОДАЙТЕ ЦЕ
+                id: home_tab  # ДОДАЙТЕ ЦЕ
+            
             AnalyticsTab:
+                name: "analytics"  # ДОДАЙТЕ ЦЕ
+            
             SavingsTab:
+                name: "savings"  # ДОДАЙТЕ ЦЕ
+            
             AITab:
+                name: "ai"  # ДОДАЙТЕ ЦЕ
+            
             AccountTab:
+                name: "account"  # ДОДАЙТЕ ЦЕ
 
         BoxLayout:
             size_hint_y: None
