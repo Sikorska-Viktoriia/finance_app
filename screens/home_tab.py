@@ -6,13 +6,13 @@ from kivy.metrics import dp
 from kivy.app import App
 from kivy.clock import Clock
 from kivy.properties import StringProperty, ObjectProperty
-from kivy.graphics import Line  # Додаємо імпорт Line
+from kivy.graphics import Line
 
 from db_manager import cursor, conn, log_transaction
 
 class HomeTab(Screen):
     """Home tab with balance and transactions."""
-    current_filter = StringProperty("Всі")
+    current_filter = StringProperty("Всі банки")
     create_card_modal = ObjectProperty(None)
     
     def __init__(self, **kwargs):
@@ -20,7 +20,7 @@ class HomeTab(Screen):
         self._update_scheduled = False
         self.current_card_index = 0
         self.cards_data = []
-        # Додаємо затримку для ініціалізації
+        self.available_banks = ["Всі банки"]  # Список доступних банків
         Clock.schedule_once(self.delayed_init, 0.5)
     
     def delayed_init(self, dt):
@@ -53,22 +53,22 @@ class HomeTab(Screen):
             if 'welcome_label' in self.ids:
                 self.ids.welcome_label.text = f"Ласкаво просимо, {app.current_user}!"
             
-            # Отримуємо баланс з бази даних
+            # Отримуємо баланс з гаманця
             try:
                 cursor.execute("SELECT balance FROM wallets WHERE user_id=?", (app.current_user_id,))
                 result = cursor.fetchone()
-                if result:
-                    app.balance = result[0]
-                    if 'balance_label' in self.ids:
-                        self.ids.balance_label.text = f"Баланс: {app.balance:.2f} $"
-                        print(f"Balance loaded: {app.balance}")
-                else:
-                    cursor.execute("INSERT INTO wallets (user_id, balance) VALUES (?, ?)", 
-                                (app.current_user_id, 0.0))
-                    conn.commit()
-                    app.balance = 0.0
-                    if 'balance_label' in self.ids:
-                        self.ids.balance_label.text = f"Баланс: 0.00 $"
+                wallet_balance = result[0] if result else 0.0
+                
+                # Отримуємо загальний баланс з карток
+                from db_manager import get_total_balance
+                cards_balance = get_total_balance(cursor, app.current_user_id)
+                
+                # Сумарний баланс
+                total_balance = wallet_balance + cards_balance
+                
+                if 'balance_label' in self.ids:
+                    self.ids.balance_label.text = f"Загальний баланс: {total_balance:.2f} $"
+                    print(f"Total balance loaded: {total_balance} (wallet: {wallet_balance}, cards: {cards_balance})")
                     
                 # Завантажуємо картки користувача
                 self.load_user_cards()
@@ -84,7 +84,27 @@ class HomeTab(Screen):
             if 'welcome_label' in self.ids:
                 self.ids.welcome_label.text = "Ласкаво просимо!"
             if 'balance_label' in self.ids:
-                self.ids.balance_label.text = "Баланс: 0.00 $"
+                self.ids.balance_label.text = "Загальний баланс: 0.00 $"
+    
+    def update_bank_list(self):
+        """Update available banks list from user cards."""
+        banks = set(["Всі банки"])  # Завжди додаємо "Всі банки"
+        
+        # Додаємо банки з карток користувача
+        for card in self.cards_data:
+            banks.add(card['bank'])
+        
+        self.available_banks = sorted(list(banks))
+        
+        # Оновлюємо спіннер через ids
+        if 'bank_spinner' in self.ids:
+            self.ids.bank_spinner.values = self.available_banks
+            # Встановлюємо поточний фільтр, якщо він ще в списку
+            if self.current_filter in self.available_banks:
+                self.ids.bank_spinner.text = self.current_filter
+            else:
+                self.ids.bank_spinner.text = "Всі банки"
+                self.current_filter = "Всі банки"
     
     def create_add_card_button(self):
         """Create add card button for carousel."""
@@ -108,7 +128,6 @@ class HomeTab(Screen):
                 size=add_card_button.size,
                 radius=[dp(25),]
             )
-            # Додаємо пунктирну рамку
             Color(0.6, 0.6, 0.6, 0.6)
             Line(
                 rounded_rectangle=[add_card_button.x, add_card_button.y, 
@@ -123,79 +142,107 @@ class HomeTab(Screen):
     def show_create_card_modal(self, instance=None):
         """Show modal for creating new card."""
         print("Showing create card modal")
-        # Створюємо модальне вікно якщо його немає
-        if not hasattr(self, 'create_card_modal') or self.create_card_modal is None:
-            from kivy.uix.modalview import ModalView
-            from kivy.uix.boxlayout import BoxLayout
-            from kivy.uix.textinput import TextInput
-            from kivy.uix.spinner import Spinner
-            from kivy.uix.button import Button
-            
-            self.create_card_modal = ModalView(
-                size_hint=(0.8, 0.6),
-                background_color=(0, 0, 0, 0.5)
-            )
-            
-            # Створюємо вміст модального вікна
-            content = BoxLayout(orientation='vertical', padding=dp(20), spacing=dp(15))
-            
-            # Заголовок
-            title = Label(
-                text="Створити нову картку",
-                font_size=dp(20),
-                bold=True,
-                size_hint_y=None,
-                height=dp(40)
-            )
-            content.add_widget(title)
-            
-            # Поля вводу
-            name_input = TextInput(
-                hint_text="Назва картки",
-                size_hint_y=None,
-                height=dp(45)
-            )
-            content.add_widget(name_input)
-            
-            number_input = TextInput(
-                hint_text="Номер картки (16 цифр)",
-                input_filter='int',
-                size_hint_y=None,
-                height=dp(45)
-            )
-            content.add_widget(number_input)
-            
-            bank_spinner = Spinner(
-                text="ПриватБанк",
-                values=["ПриватБанк", "Монобанк", "Райффайзен", "Ощадбанк", "Укрексімбанк", "Інший"],
-                size_hint_y=None,
-                height=dp(45)
-            )
-            content.add_widget(bank_spinner)
-            
-            # Кнопки
-            buttons_layout = BoxLayout(size_hint_y=None, height=dp(50), spacing=dp(10))
-            
-            cancel_btn = Button(
-                text="Скасувати",
-                background_color=(0.8, 0.2, 0.2, 1)
-            )
-            cancel_btn.bind(on_press=lambda x: self.create_card_modal.dismiss())
-            buttons_layout.add_widget(cancel_btn)
-            
-            create_btn = Button(
-                text="Створити",
-                background_color=(0.2, 0.8, 0.2, 1)
-            )
-            create_btn.bind(on_press=lambda x: self.create_card_from_modal(
-                name_input.text, number_input.text, bank_spinner.text
-            ))
-            buttons_layout.add_widget(create_btn)
-            
-            content.add_widget(buttons_layout)
-            self.create_card_modal.add_widget(content)
+        # Створюємо модальне вікно
+        from kivy.uix.modalview import ModalView
+        from kivy.uix.boxlayout import BoxLayout
+        from kivy.uix.textinput import TextInput
+        from kivy.uix.spinner import Spinner
+        from kivy.uix.button import Button
         
-        self.create_card_modal.open()
+        modal = ModalView(
+            size_hint=(0.8, 0.6),
+            background_color=(0, 0, 0, 0.5),
+            auto_dismiss=False
+        )
+        
+        # Створюємо вміст модального вікна
+        content = BoxLayout(orientation='vertical', padding=dp(20), spacing=dp(15))
+        
+        # Заголовок
+        title = Label(
+            text="Створити нову картку",
+            font_size=dp(20),
+            bold=True,
+            size_hint_y=None,
+            height=dp(40)
+        )
+        content.add_widget(title)
+        
+        # Поля вводу
+        name_input = TextInput(
+            hint_text="Назва картки",
+            size_hint_y=None,
+            height=dp(45)
+        )
+        content.add_widget(name_input)
+        
+        number_input = TextInput(
+            hint_text="Номер картки (16 цифр)",
+            input_filter='int',
+            size_hint_y=None,
+            height=dp(45)
+        )
+        content.add_widget(number_input)
+        
+        # Список банків для створення
+        bank_spinner = Spinner(
+            text="ПриватБанк",
+            values=["ПриватБанк", "Монобанк", "Райффайзен", "Ощадбанк", "Укрексімбанк", "Інший"],
+            size_hint_y=None,
+            height=dp(45)
+        )
+        content.add_widget(bank_spinner)
+        
+        # Повідомлення про помилку
+        error_label = Label(
+            text="",
+            color=(1, 0, 0, 1),
+            size_hint_y=None,
+            height=dp(30)
+        )
+        content.add_widget(error_label)
+        
+        # Кнопки
+        buttons_layout = BoxLayout(size_hint_y=None, height=dp(50), spacing=dp(10))
+        
+        cancel_btn = Button(
+            text="Скасувати",
+            background_color=(0.8, 0.2, 0.2, 1)
+        )
+        cancel_btn.bind(on_press=modal.dismiss)
+        buttons_layout.add_widget(cancel_btn)
+        
+        create_btn = Button(
+            text="Створити",
+            background_color=(0.2, 0.8, 0.2, 1)
+        )
+        
+        def create_card(instance):
+            card_name = name_input.text.strip()
+            card_number = number_input.text.strip()
+            bank_name = bank_spinner.text
+            
+            if not card_name:
+                error_label.text = "Введіть назву картки"
+                return
+                
+            if not card_number or len(card_number) != 16 or not card_number.isdigit():
+                error_label.text = "Введіть коректний номер картки (16 цифр)"
+                return
+            
+            # Створюємо картку
+            success = self.create_card_from_modal(card_name, card_number, bank_name)
+            if success:
+                modal.dismiss()
+            else:
+                error_label.text = "Помилка при створенні картки"
+        
+        create_btn.bind(on_press=create_card)
+        buttons_layout.add_widget(create_btn)
+        
+        content.add_widget(buttons_layout)
+        modal.add_widget(content)
+        modal.open()
     
     def show_success_message(self, message):
         """Show success message."""
@@ -211,14 +258,6 @@ class HomeTab(Screen):
         try:
             print(f"Creating card: {card_name}, {card_number}, {bank_name}")
             
-            if not card_name:
-                self.show_error_message("Введіть назву картки")
-                return
-                
-            if not card_number or len(card_number) != 16 or not card_number.isdigit():
-                self.show_error_message("Введіть коректний номер картки (16 цифр)")
-                return
-            
             # Форматуємо номер картки
             formatted_number = f"{card_number[:4]} {card_number[4:8]} {card_number[8:12]} {card_number[12:16]}"
             
@@ -226,12 +265,12 @@ class HomeTab(Screen):
             
             # Кольори для різних банків
             bank_colors = {
-                'ПриватБанк': [0.8, 0.2, 0.2, 1],  # Червоний
-                'Монобанк': [0.2, 0.4, 0.8, 1],    # Синій
-                'Райффайзен': [1.0, 0.5, 0.0, 1],  # Оранжевий
-                'Ощадбанк': [0.0, 0.6, 0.2, 1],    # Зелений
-                'Укрексімбанк': [0.6, 0.2, 0.8, 1], # Фіолетовий
-                'Інший': [0.3, 0.3, 0.3, 1]        # Сірий
+                'ПриватБанк': [0.8, 0.2, 0.2, 1],
+                'Монобанк': [0.2, 0.4, 0.8, 1],
+                'Райффайзен': [1.0, 0.5, 0.0, 1],
+                'Ощадбанк': [0.0, 0.6, 0.2, 1],
+                'Укрексімбанк': [0.6, 0.2, 0.8, 1],
+                'Інший': [0.3, 0.3, 0.3, 1]
             }
             
             color = bank_colors.get(bank_name, [0.2, 0.4, 0.8, 1])
@@ -244,24 +283,24 @@ class HomeTab(Screen):
                 card_name, 
                 formatted_number,
                 bank_name,
-                app.balance if hasattr(app, 'balance') else 0.0,
+                0.0,  # Початковий баланс
                 color
             )
             
             if card_id:
                 print(f"Card created successfully with ID: {card_id}")
-                # Закриваємо модальне вікно
-                if hasattr(self, 'create_card_modal'):
-                    self.create_card_modal.dismiss()
                 # Оновлюємо картки
                 self.load_user_cards()
                 self.show_success_message(f"Картка '{card_name}' успішно створена!")
+                return True
             else:
                 self.show_error_message("Помилка при створенні картки")
+                return False
                 
         except Exception as e:
             print(f"Error creating card: {e}")
             self.show_error_message("Сталася помилка")
+            return False
     
     def show_error_message(self, message):
         """Show error message."""
@@ -275,23 +314,42 @@ class HomeTab(Screen):
     def load_user_cards(self):
         """Load user cards from database."""
         try:
-            app = self.get_app()
-            from db_manager import get_user_cards
-            
-            print("Loading user cards...")
-            self.cards_data = get_user_cards(cursor, app.current_user_id)
-            print(f"Loaded {len(self.cards_data)} cards")
-            
-            # Якщо карток немає, створюємо дефолтну
-            if not self.cards_data:
-                print("No cards found, creating default card")
-                self.create_default_card()
+                app = self.get_app()
+                from db_manager import get_user_cards
+                
+                print("Loading user cards...")
                 self.cards_data = get_user_cards(cursor, app.current_user_id)
-            
-            self.apply_bank_filter()
+                print(f"Loaded {len(self.cards_data)} cards")
+                
+                # Додамо відлагоджувальну інформацію
+                for i, card in enumerate(self.cards_data):
+                    print(f"Card {i}: {card}")
+                
+                # Якщо карток немає, створюємо тестову картку
+                if not self.cards_data:
+                    print("No cards found, creating test card")
+                    from db_manager import create_user_card
+                    card_id = create_user_card(
+                        cursor, conn,
+                        app.current_user_id,
+                        "Тестова картка",
+                        "1234 5678 9012 3456", 
+                        "ПриватБанк",
+                        100.0,
+                        [0.8, 0.2, 0.2, 1]
+                    )
+                    print(f"Created test card with ID: {card_id}")
+                    self.cards_data = get_user_cards(cursor, app.current_user_id)
+                    print(f"Now have {len(self.cards_data)} cards")
+                
+                # Оновлюємо список банків для фільтра
+                self.update_bank_list()
+                self.apply_bank_filter()
             
         except Exception as e:
-            print(f"Error loading user cards: {e}")
+                print(f"Error loading user cards: {e}")
+                import traceback
+                traceback.print_exc()
     
     def create_default_card(self):
         """Create default card for new user."""
@@ -306,8 +364,8 @@ class HomeTab(Screen):
                 "Основний рахунок",
                 "**** **** **** 0001",
                 "ПриватБанк",
-                app.balance if hasattr(app, 'balance') else 0.0,
-                [0.2, 0.4, 0.8, 1]  # Синій колір
+                0.0,
+                [0.2, 0.4, 0.8, 1]
             )
         except Exception as e:
             print(f"Error creating default card: {e}")
@@ -317,11 +375,17 @@ class HomeTab(Screen):
         print(f"Applying filter: {self.current_filter}")
         filtered_cards = self.cards_data
         
-        if self.current_filter != "Всі":
+        if self.current_filter != "Всі банки":
             filtered_cards = [card for card in self.cards_data if card['bank'] == self.current_filter]
         
         print(f"Filtered to {len(filtered_cards)} cards")
         self.create_cards_carousel(filtered_cards)
+    
+    def change_bank_filter(self, bank_name):
+        """Change bank filter."""
+        print(f"Changing filter to: {bank_name}")
+        self.current_filter = bank_name
+        self.apply_bank_filter()
     
     def create_cards_carousel(self, cards_data=None):
         """Create carousel with bank cards."""
@@ -355,9 +419,6 @@ class HomeTab(Screen):
             add_card_button = self.create_add_card_button()
             carousel.add_widget(add_card_button)
         
-        # Додаємо обробник зміни картки
-        carousel.bind(current_slide=self.on_card_changed)
-        
         cards_container.add_widget(carousel)
         
         print(f"Created carousel with {len(carousel.slides)} slides")
@@ -384,7 +445,6 @@ class HomeTab(Screen):
                 size=card.size,
                 radius=[dp(25),]
             )
-            # Додаємо тінь
             Color(0, 0, 0, 0.2)
             RoundedRectangle(
                 pos=(card.x - dp(2), card.y - dp(2)),
@@ -439,17 +499,7 @@ class HomeTab(Screen):
         card.add_widget(balance_label)
         
         return card
-    
-    def on_card_changed(self, carousel, slide):
-        """Called when card is changed in carousel."""
-        if slide:
-            print("Card changed")
-    
-    def change_bank_filter(self, bank_name):
-        """Change bank filter."""
-        print(f"Changing filter to: {bank_name}")
-        self.current_filter = bank_name
-        self.apply_bank_filter()
+
 
     # ІНШІ МЕТОДИ ЗАЛИШАЮТЬСЯ БЕЗ ЗМІН
     def update_transactions_history(self):
@@ -640,3 +690,12 @@ class HomeTab(Screen):
         except Exception as e:
             if 'balance_label' in self.ids:
                 self.ids.balance_label.text = f"Помилка: {str(e)}"
+
+        def show_success_message(self, message):
+            """Show success message."""
+            popup = Popup(
+                title='Успіх',
+                content=Label(text=message),
+                size_hint=(0.6, 0.3)
+            )
+            popup.open()

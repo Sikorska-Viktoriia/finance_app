@@ -709,7 +709,7 @@
     name: "home_tab"
     canvas.before:
         Color:
-            rgba: LIGHT_BLUE
+            rgba: 0.9, 0.95, 1, 1  # LIGHT_BLUE
         Rectangle:
             pos: self.pos
             size: self.size
@@ -731,7 +731,7 @@
                 text: "Ласкаво просимо!"
                 font_size: dp(24)
                 bold: True
-                color: PRIMARY_PINK
+                color: 0.8, 0.2, 0.4, 1  # PRIMARY_PINK
                 size_hint_y: None
                 height: dp(40)
                 text_size: self.width, None
@@ -739,204 +739,165 @@
             
             Label:
                 id: balance_label
-                text: "Баланс: 0.00 $"
+                text: "Загальний баланс: 0.00 $"
                 font_size: dp(20)
-                color: PRIMARY_BLUE
+                color: 0.2, 0.4, 0.8, 1  # PRIMARY_BLUE
                 size_hint_y: None
                 height: dp(35)
                 text_size: self.width, None
                 halign: 'center'
         
-        # Фільтри банків
+        # Фільтр банків з випадаючим списком
         BoxLayout:
             orientation: 'horizontal'
             size_hint_y: None
             height: dp(45)
-            spacing: dp(8)
+            spacing: dp(10)
             
-            Button:
-                text: "Всі"
-                background_color: PRIMARY_BLUE if root.current_filter == "Всі" else (0.7, 0.7, 0.7, 1)
-                color: (1, 1, 1, 1) if root.current_filter == "Всі" else (0.3, 0.3, 0.3, 1)
-                font_size: dp(14)
-                size_hint_x: 0.2
-                on_press: root.change_bank_filter("Всі")
+            Label:
+                text: "Фільтр банку:"
+                font_size: dp(16)
+                color: 0.2, 0.4, 0.8, 1
+                size_hint_x: 0.3
+                text_size: self.width, None
+                halign: 'left'
+                valign: 'middle'
             
-            Button:
-                text: "Приват"
-                background_color: PRIMARY_BLUE if root.current_filter == "ПриватБанк" else (0.7, 0.7, 0.7, 1)
-                color: (1, 1, 1, 1) if root.current_filter == "ПриватБанк" else (0.3, 0.3, 0.3, 1)
-                font_size: dp(14)
-                size_hint_x: 0.2
-                on_press: root.change_bank_filter("ПриватБанк")
-            
-            Button:
-                text: "Моно"
-                background_color: PRIMARY_BLUE if root.current_filter == "Монобанк" else (0.7, 0.7, 0.7, 1)
-                color: (1, 1, 1, 1) if root.current_filter == "Монобанк" else (0.3, 0.3, 0.3, 1)
-                font_size: dp(14)
-                size_hint_x: 0.2
-                on_press: root.change_bank_filter("Монобанк")
-            
-            Button:
-                text: "Інші"
-                background_color: PRIMARY_BLUE if root.current_filter not in ["Всі", "ПриватБанк", "Монобанк"] else (0.7, 0.7, 0.7, 1)
-                color: (1, 1, 1, 1) if root.current_filter not in ["Всі", "ПриватБанк", "Монобанк"] else (0.3, 0.3, 0.3, 1)
-                font_size: dp(14)
-                size_hint_x: 0.4
-                on_press: root.change_bank_filter("Інший")
-        
-    
+            Spinner:
+                id: bank_spinner
+                text: "Всі банки"
+                values: ["Всі банки"]
+                size_hint_x: 0.7
+                background_color: 0.2, 0.4, 0.8, 1
+                color: (1, 1, 1, 1)
+                on_text: root.change_bank_filter(self.text)
         
         # Карусель з картками
         BoxLayout:
             id: cards_container
             size_hint_y: 0.45
-            padding: [adaptive_dp(10), 0]
+            padding: [dp(10), 0]
         
         # Керування коштами
-        GradientBox:
-            color1: LIGHT_PINK
+        BoxLayout:
             orientation: 'vertical'
             size_hint_y: None
-            height: adaptive_dp(140) if not is_small_screen else adaptive_dp(120)
-            padding: adaptive_padding(15)
-            spacing: adaptive_dp(12)
+            height: dp(140)
+            padding: dp(15)
+            spacing: dp(12)
+            canvas.before:
+                Color:
+                    rgba: 1, 0.9, 0.95, 1  # LIGHT_PINK
+                RoundedRectangle:
+                    pos: self.pos
+                    size: self.size
+                    radius: [dp(15),]
             
             Label:
                 text: "Керування коштами"
-                font_size: adaptive_font(18)
+                font_size: dp(18)
                 bold: True
-                color: PRIMARY_PINK
+                color: 0.8, 0.2, 0.4, 1
                 size_hint_y: None
-                height: adaptive_dp(30)
+                height: dp(30)
                 text_size: self.width, None
                 halign: 'center'
             
             BoxLayout:
                 orientation: 'horizontal'
-                spacing: adaptive_dp(12)
+                spacing: dp(12)
                 size_hint_y: None
-                height: adaptive_dp(55) if not is_small_screen else adaptive_dp(45)
+                height: dp(55)
                 
-                StyledTextInput:
+                TextInput:
                     id: amount_input
                     hint_text: "Сума"
                     input_filter: "float"
                     size_hint_x: 0.5
-                    font_size: adaptive_font(16)
+                    font_size: dp(16)
+                    background_color: (1, 1, 1, 0.8)
+                    foreground_color: (0, 0, 0, 1)
+                    padding: [dp(10), dp(10)]
+                    multiline: False
                 
                 BoxLayout:
                     orientation: 'horizontal'
-                    spacing: adaptive_dp(8)
+                    spacing: dp(8)
                     size_hint_x: 0.5
                     
-                    StyledButton:
+                    Button:
                         text: "Поповнити"
-                        background_color: SUCCESS_GREEN
-                        font_size: adaptive_font(14)
+                        background_color: 0, 0.6, 0, 1  # SUCCESS_GREEN
+                        color: (1, 1, 1, 1)
+                        font_size: dp(14)
                         on_press: root.add_money()
                     
-                    StyledButton:
+                    Button:
                         text: "Зняти"
-                        background_color: ERROR_RED
-                        font_size: adaptive_font(14)
+                        background_color: 0.8, 0, 0, 1  # ERROR_RED
+                        color: (1, 1, 1, 1)
+                        font_size: dp(14)
                         on_press: root.remove_money()
             
             Label:
                 id: money_message
                 text: ""
-                font_size: adaptive_font(12)
-                color: PRIMARY_BLUE
+                font_size: dp(12)
+                color: 0.2, 0.4, 0.8, 1
                 size_hint_y: None
-                height: adaptive_dp(20)
+                height: dp(20)
                 text_size: self.width, None
                 halign: 'center'
         
         # Історія транзакцій
-        GradientBox:
-            color1: LIGHT_PINK
+        BoxLayout:
             orientation: 'vertical'
             size_hint_y: 0.35
-            padding: adaptive_padding(15)
-            spacing: adaptive_dp(10)
+            padding: dp(15)
+            spacing: dp(10)
+            canvas.before:
+                Color:
+                    rgba: 1, 0.9, 0.95, 1  # LIGHT_PINK
+                RoundedRectangle:
+                    pos: self.pos
+                    size: self.size
+                    radius: [dp(15),]
             
             BoxLayout:
                 orientation: 'horizontal'
                 size_hint_y: None
-                height: adaptive_dp(35)
+                height: dp(35)
                 
                 Label:
                     text: "Останні транзакції"
-                    font_size: adaptive_font(18)
+                    font_size: dp(18)
                     bold: True
-                    color: PRIMARY_PINK
+                    color: 0.8, 0.2, 0.4, 1
                     text_size: self.width, None
                     halign: 'left'
                 
                 Label:
                     id: transactions_count
                     text: ""
-                    font_size: adaptive_font(14)
-                    color: PRIMARY_BLUE
+                    font_size: dp(14)
+                    color: 0.2, 0.4, 0.8, 1
                     text_size: self.width, None
                     halign: 'right'
             
             ScrollView:
                 size_hint_y: 1
                 do_scroll_x: False
-                bar_width: adaptive_dp(6)
-                bar_color: PRIMARY_BLUE
-                bar_inactive_color: PRIMARY_BLUE
+                bar_width: dp(6)
+                bar_color: 0.2, 0.4, 0.8, 1
+                bar_inactive_color: 0.2, 0.4, 0.8, 0.5
                 
                 BoxLayout:
                     id: history_container
                     orientation: 'vertical'
-                    spacing: adaptive_dp(8)
+                    spacing: dp(8)
                     size_hint_y: None
                     height: self.minimum_height
-                    padding: [adaptive_dp(5), adaptive_dp(5)]
-
-# Стиль для елементів історії транзакцій
-<TransactionItem@BoxLayout>:
-    orientation: 'horizontal'
-    size_hint_y: None
-    height: adaptive_dp(40)
-    padding: [adaptive_dp(10), 0]
-    spacing: adaptive_dp(10)
-    
-    canvas.before:
-        Color:
-            rgba: (1, 1, 1, 0.7)
-        RoundedRectangle:
-            pos: self.pos
-            size: self.size
-            radius: [adaptive_dp(10),]
-    
-    Label:
-        text: root.date
-        font_size: adaptive_font(12)
-        color: (0.3, 0.3, 0.3, 1)
-        size_hint_x: 0.25
-        text_size: self.width, None
-        halign: 'left'
-    
-    Label:
-        text: root.description
-        font_size: adaptive_font(14)
-        color: (0.1, 0.1, 0.1, 1)
-        size_hint_x: 0.45
-        text_size: self.width, None
-        halign: 'left'
-    
-    Label:
-        text: root.amount
-        font_size: adaptive_font(14)
-        color: root.amount_color
-        size_hint_x: 0.3
-        text_size: self.width, None
-        halign: 'right'
-        bold: True
+                    padding: [dp(5), dp(5)]
 
 <AnalyticsTab>:
     name: "analytics_tab"

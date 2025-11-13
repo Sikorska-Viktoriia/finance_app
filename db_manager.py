@@ -52,6 +52,21 @@ def init_database():
         )
     ''')
 
+    # User cards table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS user_cards(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            name TEXT NOT NULL,
+            number TEXT NOT NULL,
+            bank TEXT NOT NULL,
+            balance REAL DEFAULT 0.0,
+            color TEXT DEFAULT '[0.2, 0.4, 0.8, 1]',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+    ''')
+
     # Savings plans table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS savings_plans(
@@ -108,6 +123,85 @@ def check_password(password, hashed):
     except:
         return False
 
+# Card Management Functions
+def create_user_card(cursor, conn, user_id, name, number, bank, balance=0.0, color=None):
+    """Create a new card for user."""
+    try:
+        if color is None:
+            color = '[0.2, 0.4, 0.8, 1]'
+        elif isinstance(color, list):
+            color = str(color)
+            
+        cursor.execute(
+            "INSERT INTO user_cards (user_id, name, number, bank, balance, color) VALUES (?, ?, ?, ?, ?, ?)",
+            (user_id, name, number, bank, balance, color)
+        )
+        conn.commit()
+        return cursor.lastrowid
+    except Exception as e:
+        print(f"Error creating user card: {e}")
+        return None
+
+def get_user_cards(cursor, user_id):
+    """Get all cards for a user."""
+    try:
+        cursor.execute(
+            "SELECT id, name, number, bank, balance, color FROM user_cards WHERE user_id=?",
+            (user_id,)
+        )
+        cards = cursor.fetchall()
+        
+        result = []
+        for card in cards:
+            card_id, name, number, bank, balance, color = card
+            # Convert color string to list if needed
+            if isinstance(color, str):
+                try:
+                    color = eval(color)  # Convert string to list
+                except:
+                    color = [0.2, 0.4, 0.8, 1]  # Default color
+                    
+            result.append({
+                'id': card_id,
+                'name': name,
+                'number': number,
+                'bank': bank,
+                'balance': balance,
+                'color': color
+            })
+        
+        return result
+    except Exception as e:
+        print(f"Error getting user cards: {e}")
+        return []
+
+def get_total_balance(cursor, user_id):
+    """Get total balance from all user cards."""
+    try:
+        cursor.execute(
+            "SELECT SUM(balance) FROM user_cards WHERE user_id=?",
+            (user_id,)
+        )
+        result = cursor.fetchone()
+        total = result[0] if result and result[0] is not None else 0.0
+        return total
+    except Exception as e:
+        print(f"Error getting total balance: {e}")
+        return 0.0
+
+def update_card_balance(cursor, conn, card_id, new_balance):
+    """Update balance for specific card."""
+    try:
+        cursor.execute(
+            "UPDATE user_cards SET balance=? WHERE id=?",
+            (new_balance, card_id)
+        )
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error updating card balance: {e}")
+        return False
+
 # Logging Functions
 def log_transaction(cursor, conn, user_id, trans_type, amount, description=""):
     """Log a transaction to the database. Skip non-financial operations."""
@@ -150,5 +244,6 @@ os.environ['KIVY_NO_MTDEV'] = '1'
 __all__ = [
     'conn', 'cursor', 
     'is_valid_email', 'is_valid_password', 'hash_password', 'check_password',
-    'log_transaction', 'log_savings_transaction'
+    'log_transaction', 'log_savings_transaction',
+    'create_user_card', 'get_user_cards', 'get_total_balance', 'update_card_balance'
 ]
