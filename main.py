@@ -2,6 +2,7 @@ from kivy.app import App
 from kivy.lang import Builder
 from kivy.uix.screenmanager import ScreenManager, SlideTransition
 from kivy.core.window import Window
+from kivy.properties import StringProperty, NumericProperty
 
 # Import screens
 from screens import (StartScreen, RegistrationScreen, LoginScreen, 
@@ -12,7 +13,10 @@ from screens import (StartScreen, RegistrationScreen, LoginScreen,
 Builder.load_file("kv/screens.kv")
 
 class FinanceScreenManager(ScreenManager):
-    pass
+    # Властивості для зберігання даних користувача
+    current_user = StringProperty("")
+    current_user_id = NumericProperty(0)
+    balance = NumericProperty(0.0)
 
 class FinanceApp(App):
     def __init__(self, **kwargs):

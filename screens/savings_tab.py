@@ -6,14 +6,15 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.textinput import TextInput
 from kivy.uix.button import Button
 from kivy.uix.gridlayout import GridLayout
+from kivy.uix.spinner import Spinner
 from kivy.metrics import dp
 from kivy.app import App
 from kivy.clock import Clock
 from kivy.graphics import Color, Rectangle, Line
-from db_manager import cursor, conn, log_transaction, log_savings_transaction
+from db_manager import cursor, conn, log_transaction, log_savings_transaction, get_user_cards, get_user_card_by_id
 from widgets import SavingsPlanItem
 
-# Константи кольорів
+# Кольори
 PRIMARY_PINK = (0.95, 0.3, 0.5, 1)
 PRIMARY_BLUE = (0.2, 0.7, 0.9, 1)
 LIGHT_PINK = (1, 0.95, 0.95, 1)
@@ -174,7 +175,7 @@ class DatePickerPopup(WhitePopup):
         )
         
         # Кнопка попереднього дня
-        prev_btn = WhiteButton(text='◀')
+        prev_btn = WhiteButton(text='<')
         prev_btn.background_color = LIGHT_GRAY
         prev_btn.color = DARK_TEXT
         prev_btn.bind(on_press=self.prev_day)
@@ -187,7 +188,7 @@ class DatePickerPopup(WhitePopup):
         nav_layout.add_widget(today_btn)
         
         # Кнопка наступного дня
-        next_btn = WhiteButton(text='▶')
+        next_btn = WhiteButton(text='>')
         next_btn.background_color = LIGHT_GRAY
         next_btn.color = DARK_TEXT
         next_btn.bind(on_press=self.next_day)
@@ -261,22 +262,6 @@ class DatePickerPopup(WhitePopup):
         self.selected_date += timedelta(days=days)
         self.update_display()
     
-    def add_months(self, months):
-        year = self.selected_date.year
-        month = self.selected_date.month + months
-        day = self.selected_date.day
-        
-        while month > 12:
-            month -= 12
-            year += 1
-        
-        try:
-            self.selected_date = self.selected_date.replace(year=year, month=month, day=min(day, 28))
-        except ValueError:
-            self.selected_date = self.selected_date.replace(year=year, month=month, day=28)
-        
-        self.update_display()
-    
     def update_display(self):
         self.date_label.text = self.selected_date.strftime('%d.%m.%Y')
     
@@ -290,6 +275,7 @@ class SavingsTab(Screen):
         super().__init__(**kwargs)
         self.selected_plan_id = None
         self.selected_plan_name = ""
+        self.user_cards = []  # Список карток користувача
     
     def get_app(self):
         return App.get_running_app()
@@ -297,6 +283,17 @@ class SavingsTab(Screen):
     def on_enter(self):
         Clock.schedule_once(lambda dt: self.update_savings_tab(), 0.1)
         self.clear_inputs()
+        self.load_user_cards()
+    
+    def load_user_cards(self):
+        """Завантажити карти користувача"""
+        try:
+            app = self.get_app()
+            if hasattr(app, 'current_user_id') and app.current_user_id:
+                self.user_cards = get_user_cards(cursor, app.current_user_id)
+        except Exception as e:
+            print(f"Error loading user cards: {e}")
+            self.user_cards = []
     
     def clear_inputs(self):
         if hasattr(self, 'ids'):
@@ -584,8 +581,8 @@ class SavingsTab(Screen):
             self.ids.savings_message.text = f"Помилка створення плану: {str(e)}"
             self.ids.savings_message.color = ERROR_RED
     
-    def add_to_plan(self, plan_id, plan_name, amount_text):
-        """Додавання грошей до плану"""
+    def add_to_plan(self, plan_id, plan_name, amount_text, card_id=None):
+        """Додавання грошей до плану з вибраної картки"""
         if not amount_text:
             self.ids.savings_message.text = "Введіть суму"
             self.ids.savings_message.color = ERROR_RED
@@ -599,8 +596,22 @@ class SavingsTab(Screen):
                 return
             
             app = self.get_app()
-            if amount > app.balance:
-                self.ids.savings_message.text = f"Недостатньо коштів. Доступно: ${app.balance:.2f}"
+            
+            # Якщо картка не вибрана, показуємо попап вибору
+            if not card_id:
+                self.show_card_selection_popup(plan_id, plan_name, amount, "add")
+                return
+            
+            # Перевіряємо баланс на вибраній картці
+            selected_card = get_user_card_by_id(cursor, card_id)
+            
+            if not selected_card:
+                self.ids.savings_message.text = "Картку не знайдено"
+                self.ids.savings_message.color = ERROR_RED
+                return
+            
+            if amount > selected_card['balance']:
+                self.ids.savings_message.text = f"Недостатньо коштів на картці. Доступно: ${selected_card['balance']:.2f}"
                 self.ids.savings_message.color = ERROR_RED
                 return
             
@@ -623,10 +634,11 @@ class SavingsTab(Screen):
                 self.ids.savings_message.color = ERROR_RED
                 return
             
-            # Оновлюємо баланс гаманця
-            app.balance -= amount
-            cursor.execute("UPDATE wallets SET balance=? WHERE user_id=?", 
-                         (app.balance, app.current_user_id))
+            # Знімаємо гроші з картки
+            cursor.execute(
+                "UPDATE user_cards SET balance = balance - ? WHERE id = ?",
+                (amount, card_id)
+            )
             
             # Оновлюємо план заощаджень
             cursor.execute(
@@ -637,9 +649,9 @@ class SavingsTab(Screen):
             log_transaction(
                 cursor, conn,
                 app.current_user_id, 
-                "savings_transfer", 
+                "savings_deposit", 
                 amount, 
-                f"Переведено до плану: {plan_name}"
+                f"Переведено до плану '{plan_name}' з картки {selected_card['name']}"
             )
             
             log_savings_transaction(
@@ -648,21 +660,26 @@ class SavingsTab(Screen):
                 plan_id,
                 amount,
                 "deposit",
-                f"Додано до плану заощаджень"
+                f"Додано до плану заощаджень з картки {selected_card['name']}"
             )
             
             conn.commit()
             
-            self.ids.savings_message.text = f"Успішно додано ${amount:.2f} до {plan_name}"
+            self.ids.savings_message.text = f"Успішно додано ${amount:.2f} до {plan_name} з картки {selected_card['name']}"
             self.ids.savings_message.color = SUCCESS_GREEN
             self.update_savings_tab()
             
         except ValueError:
             self.ids.savings_message.text = "Введіть коректну суму"
             self.ids.savings_message.color = ERROR_RED
-    
-    def remove_from_plan(self, plan_id, plan_name, amount_text):
-        """Вилучення грошей з плану"""
+        
+        from kivy.app import App
+        app = App.get_running_app()
+        if hasattr(app, 'root') and hasattr(app.root, 'home_tab'):
+            app.root.home_tab.update_transactions_history()
+
+    def remove_from_plan(self, plan_id, plan_name, amount_text, card_id=None):
+        """Вилучення грошей з плану на вибрану картку"""
         if not amount_text:
             self.ids.savings_message.text = "Введіть суму"
             self.ids.savings_message.color = ERROR_RED
@@ -676,6 +693,12 @@ class SavingsTab(Screen):
                 return
             
             app = self.get_app()
+            
+            # Якщо картка не вибрана, показуємо попап вибору
+            if not card_id:
+                self.show_card_selection_popup(plan_id, plan_name, amount, "remove")
+                return
+            
             cursor.execute(
                 "SELECT current_amount FROM savings_plans WHERE id = ? AND user_id = ?",
                 (plan_id, app.current_user_id)
@@ -694,10 +717,11 @@ class SavingsTab(Screen):
                 self.ids.savings_message.color = ERROR_RED
                 return
             
-            # Оновлюємо баланс гаманця
-            app.balance += amount
-            cursor.execute("UPDATE wallets SET balance=? WHERE user_id=?", 
-                        (app.balance, app.current_user_id))
+            # Додаємо гроші на картку
+            cursor.execute(
+                "UPDATE user_cards SET balance = balance + ? WHERE id = ?",
+                (amount, card_id)
+            )
             
             # Оновлюємо план заощаджень
             cursor.execute(
@@ -705,12 +729,15 @@ class SavingsTab(Screen):
                 (amount, plan_id)
             )
             
+            selected_card = get_user_card_by_id(cursor, card_id)
+            card_name = selected_card['name'] if selected_card else "картки"
+            
             log_transaction(
                 cursor, conn,
                 app.current_user_id, 
                 "savings_return", 
                 amount, 
-                f"Повернено з плану: {plan_name}"
+                f"Повернено з плану '{plan_name}' на картку {card_name}"
             )
             
             log_savings_transaction(
@@ -719,21 +746,111 @@ class SavingsTab(Screen):
                 plan_id,
                 amount,
                 "withdrawal",
-                f"Вилучено з плану заощаджень"
+                f"Вилучено з плану заощаджень на картку {card_name}"
             )
             
             conn.commit()
             
-            self.ids.savings_message.text = f"Успішно вилучено ${amount:.2f} з {plan_name}"
+            self.ids.savings_message.text = f"Успішно вилучено ${amount:.2f} з {plan_name} на картку {card_name}"
             self.ids.savings_message.color = SUCCESS_GREEN
             self.update_savings_tab()
             
         except ValueError:
             self.ids.savings_message.text = "Введіть коректну суму"
             self.ids.savings_message.color = ERROR_RED
+        
+        from kivy.app import App
+        app = App.get_running_app()
+        if hasattr(app, 'root') and hasattr(app.root, 'home_tab'):
+            app.root.home_tab.update_transactions_history()
+
+    def show_card_selection_popup(self, plan_id, plan_name, amount, operation_type):
+        """Попап для вибору картки"""
+        if not self.user_cards:
+            self.ids.savings_message.text = "У вас немає карток"
+            self.ids.savings_message.color = ERROR_RED
+            return
+        
+        content = BoxLayout(orientation='vertical', spacing=dp(20), padding=dp(25))
+        
+        with content.canvas.before:
+            Color(*WHITE)
+            self.content_rect = Rectangle(pos=content.pos, size=content.size)
+        
+        content.bind(pos=self._update_content_rect, size=self._update_content_rect)
+        
+        operation_text = "додавання до" if operation_type == "add" else "вилучення з"
+        title_label = Label(
+            text=f"Оберіть картку для {operation_text} плану",
+            font_size=dp(18),
+            color=DARK_TEXT,
+            size_hint_y=None,
+            height=dp(40),
+            bold=True
+        )
+        content.add_widget(title_label)
+        
+        info_label = Label(
+            text=f"План: {plan_name}\nСума: ${amount:.2f}",
+            font_size=dp(16),
+            color=DARK_TEXT,
+            size_hint_y=None,
+            height=dp(50)
+        )
+        content.add_widget(info_label)
+        
+        # Список карток
+        card_spinner = Spinner(
+            text=self.user_cards[0]['name'],
+            values=[card['name'] for card in self.user_cards],
+            size_hint_y=None,
+            height=dp(45),
+            background_color=WHITE,
+            color=DARK_TEXT
+        )
+        content.add_widget(card_spinner)
+        
+        # Кнопки
+        btn_layout = BoxLayout(orientation='horizontal', spacing=dp(15), size_hint_y=None, height=dp(50))
+        
+        def confirm_selection(_):
+            selected_card_name = card_spinner.text
+            selected_card = next((card for card in self.user_cards if card['name'] == selected_card_name), None)
+            
+            if selected_card:
+                if operation_type == "add":
+                    self.add_to_plan(plan_id, plan_name, str(amount), selected_card['id'])
+                else:
+                    self.remove_from_plan(plan_id, plan_name, str(amount), selected_card['id'])
+                popup.dismiss()
+        
+        confirm_btn = WhiteButton(text='ПІДТВЕРДИТИ')
+        confirm_btn.background_color = PRIMARY_PINK
+        confirm_btn.bind(on_press=confirm_selection)
+        btn_layout.add_widget(confirm_btn)
+        
+        cancel_btn = WhiteButton(text='СКАСУВАТИ')
+        cancel_btn.background_color = LIGHT_GRAY
+        cancel_btn.color = DARK_TEXT
+        cancel_btn.bind(on_press=lambda x: popup.dismiss())
+        btn_layout.add_widget(cancel_btn)
+        
+        content.add_widget(btn_layout)
+        
+        popup = WhitePopup(
+            title='Вибір картки',
+            content=content,
+            size_hint=(0.8, 0.5)
+        )
+        popup.open()
+    
+    def _update_content_rect(self, instance, value):
+        """Оновлюємо фон контенту для попапів"""
+        self.content_rect.pos = instance.pos
+        self.content_rect.size = instance.size
 
     def complete_savings_plan(self, plan_id, plan_name):
-        """Завершення плану заощаджень з переведенням грошей назад у гаманець"""
+        """Завершення плану заощаджень з переведенням грошей на вибрану картку"""
         try:
             app = self.get_app()
             cursor.execute(
@@ -754,37 +871,75 @@ class SavingsTab(Screen):
                 self.ids.savings_message.color = ERROR_RED
                 return
             
-            # Створюємо попап підтвердження
-            content = BoxLayout(orientation='vertical', spacing=dp(20), padding=dp(25))
+            # Показуємо попап вибору картки для завершення плану
+            self.show_card_selection_for_completion(plan_id, plan_name, current_amount)
             
-            # Додаємо білий фон для контенту
-            with content.canvas.before:
-                Color(*WHITE)
-                self.content_rect = Rectangle(pos=content.pos, size=content.size)
+        except Exception as e:
+            print(f"Error in complete_savings_plan: {e}")
+            self.ids.savings_message.text = f"Помилка: {str(e)}"
+            self.ids.savings_message.color = ERROR_RED
+    
+    def show_card_selection_for_completion(self, plan_id, plan_name, amount):
+        """Попап для вибору картки при завершенні плану"""
+        if not self.user_cards:
+            self.ids.savings_message.text = "У вас немає карток"
+            self.ids.savings_message.color = ERROR_RED
+            return
+        
+        content = BoxLayout(orientation='vertical', spacing=dp(20), padding=dp(25))
+        
+        with content.canvas.before:
+            Color(*WHITE)
+            self.content_rect = Rectangle(pos=content.pos, size=content.size)
+        
+        content.bind(pos=self._update_content_rect, size=self._update_content_rect)
+        
+        title_label = Label(
+            text=f"Оберіть картку для завершення плану",
+            font_size=dp(18),
+            color=DARK_TEXT,
+            size_hint_y=None,
+            height=dp(40),
+            bold=True
+        )
+        content.add_widget(title_label)
+        
+        info_label = Label(
+            text=f"План: {plan_name}\nСума: ${amount:.2f}",
+            font_size=dp(16),
+            color=DARK_TEXT,
+            size_hint_y=None,
+            height=dp(50)
+        )
+        content.add_widget(info_label)
+        
+        # Список карток
+        card_spinner = Spinner(
+            text=self.user_cards[0]['name'],
+            values=[card['name'] for card in self.user_cards],
+            size_hint_y=None,
+            height=dp(45),
+            background_color=WHITE,
+            color=DARK_TEXT
+        )
+        content.add_widget(card_spinner)
+        
+        # Кнопки
+        btn_layout = BoxLayout(orientation='horizontal', spacing=dp(15), size_hint_y=None, height=dp(50))
+        
+        def confirm_completion(_):
+            selected_card_name = card_spinner.text
+            selected_card = next((card for card in self.user_cards if card['name'] == selected_card_name), None)
             
-            content.bind(
-                pos=self._update_content_rect,
-                size=self._update_content_rect
-            )
-            
-            warning_label = Label(
-                text=f"Завершити план '{plan_name}'?\n\nСума ${current_amount:.2f} буде переведена на ваш основний рахунок, а план буде архівований.",
-                text_size=(dp(320), None), 
-                color=DARK_TEXT,
-                font_size=dp(16),
-                halign='center',
-                valign='middle'
-            )
-            content.add_widget(warning_label)
-            
-            btn_layout = BoxLayout(orientation='horizontal', spacing=dp(15), size_hint_y=None, height=dp(50))
-            
-            def confirm_complete(_):
+            if selected_card:
                 try:
-                    # Повертаємо гроші у гаманець
-                    app.balance += current_amount
-                    cursor.execute("UPDATE wallets SET balance=? WHERE user_id=?", 
-                                (app.balance, app.current_user_id))
+                    app = self.get_app()
+                    
+                    # Додаємо гроші на картку
+                    cursor.execute(
+                        "UPDATE user_cards SET balance = balance + ? WHERE id = ?",
+                        (amount, selected_card['id'])
+                    )
                     
                     # Позначаємо план як завершений
                     cursor.execute(
@@ -796,60 +951,50 @@ class SavingsTab(Screen):
                         cursor, conn,
                         app.current_user_id, 
                         "savings_completed", 
-                        current_amount, 
-                        f"Завершено план заощаджень: {plan_name}"
+                        amount, 
+                        f"Завершено план заощаджень: {plan_name} на картку {selected_card['name']}"
                     )
                     
                     log_savings_transaction(
                         cursor, conn,
                         app.current_user_id,
                         plan_id,
-                        current_amount,
+                        amount,
                         "plan_completed",
-                        f"Завершено план заощаджень"
+                        f"Завершено план заощаджень на картку {selected_card['name']}"
                     )
                     
                     conn.commit()
                     
                     popup.dismiss()
                     self.update_savings_tab()
-                    self.ids.savings_message.text = f"План '{plan_name}' успішно завершено! ${current_amount:.2f} додано до рахунку."
+                    self.ids.savings_message.text = f"План '{plan_name}' успішно завершено! ${amount:.2f} додано на картку {selected_card['name']}."
                     self.ids.savings_message.color = SUCCESS_GREEN
                     
                 except Exception as e:
                     print(f"Error completing plan: {e}")
                     self.ids.savings_message.text = f"Помилка завершення плану: {str(e)}"
                     self.ids.savings_message.color = ERROR_RED
-            
-            complete_btn = WhiteButton(text='ЗАВЕРШИТИ')
-            complete_btn.background_color = SUCCESS_GREEN
-            complete_btn.bind(on_press=confirm_complete)
-            btn_layout.add_widget(complete_btn)
-            
-            cancel_btn = WhiteButton(text='СКАСУВАТИ')
-            cancel_btn.background_color = LIGHT_GRAY
-            cancel_btn.color = DARK_TEXT
-            cancel_btn.bind(on_press=lambda x: popup.dismiss())
-            btn_layout.add_widget(cancel_btn)
-            
-            content.add_widget(btn_layout)
-            
-            popup = WhitePopup(
-                title='Завершення плану заощаджень',
-                content=content,
-                size_hint=(0.8, 0.5)
-            )
-            popup.open()
-            
-        except Exception as e:
-            print(f"Error in complete_savings_plan: {e}")
-            self.ids.savings_message.text = f"Помилка: {str(e)}"
-            self.ids.savings_message.color = ERROR_RED
-    
-    def _update_content_rect(self, instance, value):
-        """Оновлюємо фон контенту для попапів"""
-        self.content_rect.pos = instance.pos
-        self.content_rect.size = instance.size
+        
+        complete_btn = WhiteButton(text='ЗАВЕРШИТИ')
+        complete_btn.background_color = SUCCESS_GREEN
+        complete_btn.bind(on_press=confirm_completion)
+        btn_layout.add_widget(complete_btn)
+        
+        cancel_btn = WhiteButton(text='СКАСУВАТИ')
+        cancel_btn.background_color = LIGHT_GRAY
+        cancel_btn.color = DARK_TEXT
+        cancel_btn.bind(on_press=lambda x: popup.dismiss())
+        btn_layout.add_widget(cancel_btn)
+        
+        content.add_widget(btn_layout)
+        
+        popup = WhitePopup(
+            title='Завершення плану заощаджень',
+            content=content,
+            size_hint=(0.8, 0.5)
+        )
+        popup.open()
 
     def edit_specific_plan(self, plan_id, plan_name):
         """Редагування конкретного плану"""
@@ -1066,7 +1211,7 @@ class SavingsTab(Screen):
         
         warning_text = f"Ви дійсно хочете видалити план '{self.selected_plan_name}'?"
         if current_amount > 0:
-            warning_text += f"\n\nУвага: у плані є ${current_amount:.2f}. Ці кошти будуть повернуті на ваш основний рахунок."
+            warning_text += f"\n\nУвага: у плані є ${current_amount:.2f}. Ці кошти будуть повернуті на вашу картку."
         
         warning_label = Label(
             text=warning_text, 
@@ -1084,39 +1229,31 @@ class SavingsTab(Screen):
             try:
                 app = self.get_app()
                 
-                # Повертаємо гроші у гаманець, якщо вони є
+                # Повертаємо гроші на картку, якщо вони є
                 if current_amount > 0:
-                    app.balance += current_amount
-                    cursor.execute("UPDATE wallets SET balance=? WHERE user_id=?", 
-                                (app.balance, app.current_user_id))
+                    # Показуємо попап вибору картки для повернення коштів
+                    self.show_card_selection_for_deletion(self.selected_plan_id, self.selected_plan_name, current_amount)
+                else:
+                    # Просто видаляємо план без коштів
+                    cursor.execute("DELETE FROM savings_plans WHERE id=?", (self.selected_plan_id,))
                     
-                    log_transaction(
+                    log_savings_transaction(
                         cursor, conn,
-                        app.current_user_id, 
-                        "savings_return", 
-                        current_amount, 
-                        f"Повернено при видаленні плану: {self.selected_plan_name}"
+                        app.current_user_id,
+                        self.selected_plan_id,
+                        0,
+                        "plan_deleted",
+                        f"Видалено план заощаджень"
                     )
-                
-                # Видаляємо план
-                cursor.execute("DELETE FROM savings_plans WHERE id=?", (self.selected_plan_id,))
-                
-                log_savings_transaction(
-                    cursor, conn,
-                    app.current_user_id,
-                    self.selected_plan_id,
-                    current_amount,
-                    "plan_deleted",
-                    f"Видалено план заощаджень"
-                )
-                
-                conn.commit()
+                    
+                    conn.commit()
+                    
+                    self.clear_inputs()
+                    self.update_savings_tab()
+                    self.ids.savings_message.text = "План успішно видалено!"
+                    self.ids.savings_message.color = SUCCESS_GREEN
                 
                 popup.dismiss()
-                self.clear_inputs()
-                self.update_savings_tab()
-                self.ids.savings_message.text = "План успішно видалено!"
-                self.ids.savings_message.color = SUCCESS_GREEN
                 
             except Exception as e:
                 print(f"Error deleting plan: {e}")
@@ -1138,6 +1275,121 @@ class SavingsTab(Screen):
         
         popup = WhitePopup(
             title='Підтвердження видалення',
+            content=content,
+            size_hint=(0.8, 0.5)
+        )
+        popup.open()
+    
+    def show_card_selection_for_deletion(self, plan_id, plan_name, amount):
+        """Попап для вибору картки при видаленні плану з коштами"""
+        if not self.user_cards:
+            self.ids.savings_message.text = "У вас немає карток"
+            self.ids.savings_message.color = ERROR_RED
+            return
+        
+        content = BoxLayout(orientation='vertical', spacing=dp(20), padding=dp(25))
+        
+        with content.canvas.before:
+            Color(*WHITE)
+            self.content_rect = Rectangle(pos=content.pos, size=content.size)
+        
+        content.bind(pos=self._update_content_rect, size=self._update_content_rect)
+        
+        title_label = Label(
+            text=f"Оберіть картку для повернення коштів",
+            font_size=dp(18),
+            color=DARK_TEXT,
+            size_hint_y=None,
+            height=dp(40),
+            bold=True
+        )
+        content.add_widget(title_label)
+        
+        info_label = Label(
+            text=f"План: {plan_name}\nСума: ${amount:.2f}",
+            font_size=dp(16),
+            color=DARK_TEXT,
+            size_hint_y=None,
+            height=dp(50)
+        )
+        content.add_widget(info_label)
+        
+        # Список карток
+        card_spinner = Spinner(
+            text=self.user_cards[0]['name'],
+            values=[card['name'] for card in self.user_cards],
+            size_hint_y=None,
+            height=dp(45),
+            background_color=WHITE,
+            color=DARK_TEXT
+        )
+        content.add_widget(card_spinner)
+        
+        # Кнопки
+        btn_layout = BoxLayout(orientation='horizontal', spacing=dp(15), size_hint_y=None, height=dp(50))
+        
+        def confirm_deletion(_):
+            selected_card_name = card_spinner.text
+            selected_card = next((card for card in self.user_cards if card['name'] == selected_card_name), None)
+            
+            if selected_card:
+                try:
+                    app = self.get_app()
+                    
+                    # Додаємо гроші на картку
+                    cursor.execute(
+                        "UPDATE user_cards SET balance = balance + ? WHERE id = ?",
+                        (amount, selected_card['id'])
+                    )
+                    
+                    # Видаляємо план
+                    cursor.execute("DELETE FROM savings_plans WHERE id=?", (plan_id,))
+                    
+                    log_transaction(
+                        cursor, conn,
+                        app.current_user_id, 
+                        "savings_return", 
+                        amount, 
+                        f"Повернено при видаленні плану: {plan_name} на картку {selected_card['name']}"
+                    )
+                    
+                    log_savings_transaction(
+                        cursor, conn,
+                        app.current_user_id,
+                        plan_id,
+                        amount,
+                        "plan_deleted",
+                        f"Видалено план заощаджень з поверненням на картку {selected_card['name']}"
+                    )
+                    
+                    conn.commit()
+                    
+                    popup.dismiss()
+                    self.clear_inputs()
+                    self.update_savings_tab()
+                    self.ids.savings_message.text = f"План успішно видалено! ${amount:.2f} повернуто на картку {selected_card['name']}."
+                    self.ids.savings_message.color = SUCCESS_GREEN
+                    
+                except Exception as e:
+                    print(f"Error deleting plan with funds: {e}")
+                    self.ids.savings_message.text = f"Помилка видалення: {str(e)}"
+                    self.ids.savings_message.color = ERROR_RED
+        
+        delete_btn = WhiteButton(text='ВИДАЛИТИ')
+        delete_btn.background_color = ERROR_RED
+        delete_btn.bind(on_press=confirm_deletion)
+        btn_layout.add_widget(delete_btn)
+        
+        cancel_btn = WhiteButton(text='СКАСУВАТИ')
+        cancel_btn.background_color = LIGHT_GRAY
+        cancel_btn.color = DARK_TEXT
+        cancel_btn.bind(on_press=lambda x: popup.dismiss())
+        btn_layout.add_widget(cancel_btn)
+        
+        content.add_widget(btn_layout)
+        
+        popup = WhitePopup(
+            title='Повернення коштів при видаленні',
             content=content,
             size_hint=(0.8, 0.5)
         )

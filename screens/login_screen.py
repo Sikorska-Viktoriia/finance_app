@@ -1,4 +1,3 @@
-# screens/login_screen.py
 from kivy.uix.screenmanager import Screen
 from kivy.app import App
 from kivy.clock import Clock
@@ -34,6 +33,7 @@ class LoginScreen(Screen):
                     app.root.balance = balance
                     app.balance = balance
                 else:
+                    # Якщо гаманця немає (має бути, але для безпеки)
                     cursor.execute("INSERT INTO wallets (user_id, balance) VALUES (?, ?)", 
                                  (user[0], 0.0))
                     conn.commit()
@@ -41,7 +41,7 @@ class LoginScreen(Screen):
                     app.root.balance = balance
                     app.balance = balance
 
-                print(f"Login successful: {user[1]}, balance: {balance}")
+                print(f"Login successful: {user[1]}, user_id: {user[0]}, balance: {balance}")
                 
                 self.manager.transition.direction = 'left'
                 self.manager.current = "dashboard_screen"
@@ -53,6 +53,7 @@ class LoginScreen(Screen):
                 msg_label.text = "Невірна електронна адреса або пароль"
         except Exception as e:
             msg_label.text = f"Помилка входу: {str(e)}"
+            print(f"Login error: {e}")
 
     def force_dashboard_update(self):
         """Force dashboard to update after login."""

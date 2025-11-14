@@ -28,263 +28,8 @@
 #: set WHITE_BG (1, 1, 1, 1)               # Білий фон для модальних вікон
 #: set DARK_TEXT (0.1, 0.1, 0.1, 1)        # Темний текст для модальних вікон
 
-<BankCard>:
-    size_hint: (0.85, 0.75)
-    pos_hint: {'center_x': 0.5, 'center_y': 0.5}
-    padding: adaptive_dp(20)
-    spacing: adaptive_dp(12)
-    
-    canvas.before:
-        Color:
-            rgba: root.card_color
-        RoundedRectangle:
-            pos: self.pos
-            size: self.size
-            radius: [adaptive_dp(25),]
-        # Додаємо тінь
-        Color:
-            rgba: 0, 0, 0, 0.1
-        RoundedRectangle:
-            pos: (self.x - adaptive_dp(2), self.y - adaptive_dp(2))
-            size: self.size
-            radius: [adaptive_dp(25),]
 
-    BoxLayout:
-        orientation: 'vertical'
-        spacing: adaptive_dp(8)
-        
-        # Заголовок банку
-        BoxLayout:
-            size_hint_y: None
-            height: adaptive_dp(30)
-            spacing: adaptive_dp(8)
-            
-            Label:
-                text: root.get_bank_icon()
-                font_size: adaptive_font(20)
-                color: (1, 1, 1, 0.9)
-                size_hint_x: None
-                width: adaptive_dp(40)
-                bold: True
-            
-            Label:
-                text: root.bank_name
-                font_size: adaptive_font(16)
-                color: (1, 1, 1, 0.8)
-                halign: 'left'
-                text_size: self.width, None
-        
-        # Назва картки
-        Label:
-            text: root.card_name
-            font_size: adaptive_font(22)
-            bold: True
-            color: (1, 1, 1, 1)
-            size_hint_y: None
-            height: adaptive_dp(35)
-            text_size: self.width, None
-            halign: 'left'
-        
-        # Номер картки
-        Label:
-            text: root.card_number
-            font_size: adaptive_font(18)
-            color: (1, 1, 1, 0.9)
-            size_hint_y: None
-            height: adaptive_dp(30)
-            text_size: self.width, None
-            halign: 'left'
-        
-        Widget:
-            size_hint_y: 1
-        
-        # Баланс
-        BoxLayout:
-            size_hint_y: None
-            height: adaptive_dp(40)
-            spacing: adaptive_dp(10)
-            
-            Label:
-                text: "Баланс:"
-                font_size: adaptive_font(16)
-                color: (1, 1, 1, 0.8)
-                size_hint_x: None
-                width: adaptive_dp(80)
-            
-            Label:
-                text: f"{root.balance:.2f} $"
-                font_size: adaptive_font(24)
-                bold: True
-                color: (1, 1, 1, 1)
-                halign: 'right'
-                text_size: self.width, None
 
-<CreateCardModal@ModalView>:
-    background_color: 0, 0, 0, 0.5
-    size_hint: (0.8, 0.6)
-    auto_dismiss: False
-    
-    BoxLayout:
-        orientation: 'vertical'
-        size: root.size
-        pos: root.pos
-        padding: adaptive_dp(30)
-        
-        BoxLayout:
-            orientation: 'vertical'
-            size_hint_y: None
-            height: self.minimum_height
-            padding: adaptive_dp(20)
-            spacing: adaptive_dp(20)
-            canvas.before:
-                Color:
-                    rgba: WHITE_BG
-                RoundedRectangle:
-                    pos: self.pos
-                    size: self.size
-                    radius: [adaptive_dp(20),]
-            
-            # Заголовок
-            Label:
-                text: "Створити нову картку"
-                font_size: adaptive_font(24)
-                bold: True
-                color: PRIMARY_PINK
-                size_hint_y: None
-                height: adaptive_dp(50)
-                text_size: self.width, None
-                halign: 'center'
-            
-            # Поля вводу
-            BoxLayout:
-                orientation: 'vertical'
-                spacing: adaptive_dp(15)
-                size_hint_y: None
-                height: adaptive_dp(250)
-                
-                # Назва картки
-                BoxLayout:
-                    orientation: 'vertical'
-                    spacing: adaptive_dp(5)
-                    size_hint_y: None
-                    height: adaptive_dp(70)
-                    
-                    Label:
-                        text: "Назва картки:"
-                        font_size: adaptive_font(16)
-                        color: DARK_TEXT
-                        size_hint_y: None
-                        height: adaptive_dp(25)
-                        text_size: self.width, None
-                        halign: 'left'
-                    
-                    StyledTextInput:
-                        id: card_name_input
-                        hint_text: "Наприклад: Основна картка"
-                        size_hint_y: None
-                        height: adaptive_dp(45)
-                
-                # Номер картки
-                BoxLayout:
-                    orientation: 'vertical'
-                    spacing: adaptive_dp(5)
-                    size_hint_y: None
-                    height: adaptive_dp(70)
-                    
-                    Label:
-                        text: "Номер картки (16 цифр):"
-                        font_size: adaptive_font(16)
-                        color: DARK_TEXT
-                        size_hint_y: None
-                        height: adaptive_dp(25)
-                        text_size: self.width, None
-                        halign: 'left'
-                    
-                    StyledTextInput:
-                        id: card_number_input
-                        hint_text: "0000000000000000"
-                        input_filter: 'int'
-                        size_hint_y: None
-                        height: adaptive_dp(45)
-                
-                # Вибір банку
-                BoxLayout:
-                    orientation: 'vertical'
-                    spacing: adaptive_dp(5)
-                    size_hint_y: None
-                    height: adaptive_dp(70)
-                    
-                    Label:
-                        text: "Банк:"
-                        font_size: adaptive_font(16)
-                        color: DARK_TEXT
-                        size_hint_y: None
-                        height: adaptive_dp(25)
-                        text_size: self.width, None
-                        halign: 'left'
-                    
-                    Spinner:
-                        id: bank_spinner
-                        text: "ПриватБанк"
-                        values: ["ПриватБанк", "Монобанк", "Райффайзен", "Ощадбанк", "Укрексімбанк", "Інший"]
-                        size_hint_y: None
-                        height: adaptive_dp(45)
-                        background_color: PRIMARY_BLUE
-                        color: (1, 1, 1, 1)
-                        font_size: adaptive_font(16)
-            
-            # Повідомлення про помилку
-            Label:
-                id: error_label
-                text: ""
-                color: ERROR_RED
-                size_hint_y: None
-                height: adaptive_dp(30)
-                text_size: self.width, None
-                halign: 'center'
-            
-            # Кнопки
-            BoxLayout:
-                orientation: 'horizontal'
-                spacing: adaptive_dp(15)
-                size_hint_y: None
-                height: adaptive_dp(55)
-                
-                StyledButton:
-                    text: "Скасувати"
-                    background_color: ERROR_RED
-                    on_press: root.dismiss()
-                
-                StyledButton:
-                    text: "Створити"
-                    background_color: SUCCESS_GREEN
-                    on_press: root.parent.parent.create_card_from_modal(card_name_input.text, card_number_input.text, bank_spinner.text)
-
-<WhitePopup>:
-    background_color: 1, 1, 1, 1
-    title_color: 0.1, 0.1, 0.1, 1
-    separator_color: 0.9, 0.9, 0.9, 1
-    separator_height: 1
-
-<WhiteButton>:
-    background_normal: ''
-    background_color: 0.2, 0.7, 0.9, 1
-    color: 1, 1, 1, 1
-    font_size: 16
-    size_hint_y: None
-    height: 45
-
-<WhiteTextInput>:
-    multiline: False
-    padding: [12, 12]
-    background_color: 1, 1, 1, 1
-    background_normal: ''
-    background_active: ''
-    foreground_color: 0.1, 0.1, 0.1, 1
-    font_size: 16
-    size_hint_y: None
-    height: 45
-    cursor_color: 0.1, 0.1, 0.1, 1
 
 <GradientBox@BoxLayout>:
     color1: 1, 1, 1, 1
@@ -709,7 +454,7 @@
     name: "home_tab"
     canvas.before:
         Color:
-            rgba: 0.9, 0.95, 1, 1  # LIGHT_BLUE
+            rgba: 0.9, 0.95, 1, 1  # LIGHT_BLUE - основний фон
         Rectangle:
             pos: self.pos
             size: self.size
@@ -768,92 +513,40 @@
                 text: "Всі банки"
                 values: ["Всі банки"]
                 size_hint_x: 0.7
-                background_color: 0.2, 0.4, 0.8, 1
-                color: (1, 1, 1, 1)
+                background_color: 1, 1, 1, 0.8  # БІЛИЙ ФОН
+                color: 0.2, 0.4, 0.8, 1  # СИНІЙ ТЕКСТ
+                background_normal: ''
+                background_down: ''
+                # Прибираємо стандартну стрілку/квадратик
+                canvas.after:
+                    Clear
+                canvas.before:
+                    Color:
+                        rgba: 0.2, 0.4, 0.8, 1  # СИНІЙ ФОН
+                    RoundedRectangle:
+                        pos: self.pos
+                        size: self.size
+                        radius: [dp(5),]
                 on_text: root.change_bank_filter(self.text)
         
-        # Карусель з картками
+        # Карусель з картками - контейнер має блакитний фон
         BoxLayout:
             id: cards_container
             size_hint_y: 0.45
             padding: [dp(10), 0]
-        
-        # Керування коштами
-        BoxLayout:
-            orientation: 'vertical'
-            size_hint_y: None
-            height: dp(140)
-            padding: dp(15)
-            spacing: dp(12)
             canvas.before:
                 Color:
-                    rgba: 1, 0.9, 0.95, 1  # LIGHT_PINK
+                    rgba: 0.9, 0.95, 1, 1 
                 RoundedRectangle:
                     pos: self.pos
                     size: self.size
                     radius: [dp(15),]
-            
-            Label:
-                text: "Керування коштами"
-                font_size: dp(18)
-                bold: True
-                color: 0.8, 0.2, 0.4, 1
-                size_hint_y: None
-                height: dp(30)
-                text_size: self.width, None
-                halign: 'center'
-            
-            BoxLayout:
-                orientation: 'horizontal'
-                spacing: dp(12)
-                size_hint_y: None
-                height: dp(55)
-                
-                TextInput:
-                    id: amount_input
-                    hint_text: "Сума"
-                    input_filter: "float"
-                    size_hint_x: 0.5
-                    font_size: dp(16)
-                    background_color: (1, 1, 1, 0.8)
-                    foreground_color: (0, 0, 0, 1)
-                    padding: [dp(10), dp(10)]
-                    multiline: False
-                
-                BoxLayout:
-                    orientation: 'horizontal'
-                    spacing: dp(8)
-                    size_hint_x: 0.5
-                    
-                    Button:
-                        text: "Поповнити"
-                        background_color: 0, 0.6, 0, 1  # SUCCESS_GREEN
-                        color: (1, 1, 1, 1)
-                        font_size: dp(14)
-                        on_press: root.add_money()
-                    
-                    Button:
-                        text: "Зняти"
-                        background_color: 0.8, 0, 0, 1  # ERROR_RED
-                        color: (1, 1, 1, 1)
-                        font_size: dp(14)
-                        on_press: root.remove_money()
-            
-            Label:
-                id: money_message
-                text: ""
-                font_size: dp(12)
-                color: 0.2, 0.4, 0.8, 1
-                size_hint_y: None
-                height: dp(20)
-                text_size: self.width, None
-                halign: 'center'
-        
+
         # Історія транзакцій
         BoxLayout:
             orientation: 'vertical'
             size_hint_y: 0.35
-            padding: dp(15)
+            padding: [dp(15), dp(15), dp(15), dp(15)]
             spacing: dp(10)
             canvas.before:
                 Color:
@@ -887,7 +580,7 @@
             ScrollView:
                 size_hint_y: 1
                 do_scroll_x: False
-                bar_width: dp(6)
+                bar_width: dp(8)
                 bar_color: 0.2, 0.4, 0.8, 1
                 bar_inactive_color: 0.2, 0.4, 0.8, 0.5
                 
@@ -897,8 +590,8 @@
                     spacing: dp(8)
                     size_hint_y: None
                     height: self.minimum_height
-                    padding: [dp(5), dp(5)]
-
+                    padding: [dp(10), dp(5), dp(10), dp(5)]
+                    size_hint_x: 1
 <AnalyticsTab>:
     name: "analytics_tab"
     canvas.before:

@@ -1,5 +1,6 @@
 from kivy.uix.screenmanager import Screen
 from kivy.app import App
+from kivy.clock import Clock
 from db_manager import conn, cursor, is_valid_email, is_valid_password, hash_password, log_transaction
 
 class RegistrationScreen(Screen):
@@ -51,13 +52,45 @@ class RegistrationScreen(Screen):
             
             log_transaction(cursor, conn, user_id, "initial", 0, "Створено обліковий запис")
 
-            # Отримуємо додаток і зберігаємо дані
-            app = App.get_running_app()
-            app.root.current_user = username
-            app.root.current_user_id = user_id
-            app.root.balance = 0.0
-
-            self.manager.transition.direction = 'left'
-            self.manager.current = "dashboard_screen"
+            # АВТОМАТИЧНИЙ ВХІД після реєстрації
+            self.auto_login_after_registration(user_id, username, email)
+            
         except Exception as e:
             msg_label.text = f"Помилка: {str(e)}"
+
+    def auto_login_after_registration(self, user_id, username, email):
+        """Автоматичний вхід після успішної реєстрації."""
+        try:
+            app = App.get_running_app()
+            
+            # Зберігаємо дані в ОБОХ місцях для безпеки
+            app.root.current_user = username
+            app.root.current_user_id = user_id
+            app.current_user = username
+            app.current_user_id = user_id
+
+            # Встановлюємо баланс
+            app.root.balance = 0.0
+            app.balance = 0.0
+
+            print(f"Auto-login after registration: {username}, user_id: {user_id}")
+            
+            # Переходимо на головний екран
+            self.manager.transition.direction = 'left'
+            self.manager.current = "dashboard_screen"
+            
+            # Примусово оновлюємо dashboard після входу
+            Clock.schedule_once(lambda dt: self.force_dashboard_update(), 0.5)
+            
+        except Exception as e:
+            print(f"Error during auto-login: {e}")
+            # Якщо автоматичний вхід не вдався, показуємо повідомлення про успішну реєстрацію
+            self.ids.reg_message.text = "Реєстрація успішна! Будь ласка, увійдіть вручну."
+            self.manager.transition.direction = 'left'
+            self.manager.current = "login_screen"
+
+    def force_dashboard_update(self):
+        """Force dashboard to update after registration."""
+        dashboard = self.manager.get_screen('dashboard_screen')
+        if hasattr(dashboard, 'update_all_tabs'):
+            dashboard.update_all_tabs()
