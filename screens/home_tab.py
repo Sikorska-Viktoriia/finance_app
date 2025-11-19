@@ -1193,7 +1193,23 @@ class HomeTab(Screen):
             
             print("=== ДЕБАГ: Додано заголовок ===")
 
-            for i, (trans_type, amount, description, created_at) in enumerate(transactions):
+            # Фільтр для уникнення дублювання - зберігаємо унікальні транзакції
+            seen_transactions = set()
+            unique_transactions = []
+            
+            for trans in transactions:
+                trans_type, amount, description, created_at = trans
+                
+                # Створюємо унікальний ключ для транзакції
+                trans_key = (trans_type, amount, description, created_at)
+                
+                if trans_key not in seen_transactions:
+                    seen_transactions.add(trans_key)
+                    unique_transactions.append(trans)
+            
+            print(f"=== ДЕБАГ: Після фільтрації залишилось {len(unique_transactions)} унікальних транзакцій ===")
+
+            for i, (trans_type, amount, description, created_at) in enumerate(unique_transactions):
                 try:
                     print(f"=== ДЕБАГ: Обробка транзакції {i}: {trans_type} - {amount} - {description} ===")
                     
