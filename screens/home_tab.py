@@ -760,9 +760,12 @@ class HomeTab(Screen):
                     self.current_popup.dismiss()
                     self.load_user_cards()
                     self.update_content()
-                    self.show_success_message(f"Картку '{card_data['name']}' поповнено на {amount:.2f} $!")
+                    
+                    # ЛОГУЄМО ТРАНЗАКЦІЮ
                     log_transaction(cursor, conn, self.get_app().current_user_id, 
-                                  "card_deposit", amount, f"Поповнення картки {card_data['name']}")
+                                "card_deposit", amount, f"Поповнення картки {card_data['name']}")
+                    
+                    self.show_success_message(f"Картку '{card_data['name']}' поповнено на {amount:.2f} $!")
                 else:
                     error_label.text = "Помилка при поповненні картки"
                     
@@ -1134,15 +1137,9 @@ class HomeTab(Screen):
             
             print(f"=== ДЕБАГ: user_id = {app.current_user_id} ===")
             
-            # Отримуємо ВСІ транзакції
-            cursor.execute(
-                """SELECT type, amount, description, created_at 
-                FROM transactions 
-                WHERE user_id=? 
-                ORDER BY created_at DESC LIMIT 10""",
-                (app.current_user_id,)
-            )
-            transactions = cursor.fetchall()
+            # ВИКОРИСТОВУЄМО ФУНКЦІЮ ДЛЯ ПЕРЕВІРКИ
+            from db_manager import debug_transactions
+            transactions = debug_transactions(cursor, app.current_user_id)
             
             print(f"=== ДЕБАГ: Отримано {len(transactions)} транзакцій з бази ===")
 
@@ -1175,7 +1172,7 @@ class HomeTab(Screen):
             
             header_desc = Label(
                 text="Опис",
-                size_hint_x=0.5,
+                size_hint_x=0.4,
                 color=DARK_GRAY,
                 font_size=dp(14),
                 bold=True
@@ -1183,7 +1180,7 @@ class HomeTab(Screen):
             
             header_amount = Label(
                 text="Сума",
-                size_hint_x=0.2,
+                size_hint_x=0.3,
                 color=DARK_GRAY,
                 font_size=dp(14),
                 bold=True
@@ -1200,22 +1197,29 @@ class HomeTab(Screen):
                 try:
                     print(f"=== ДЕБАГ: Обробка транзакції {i}: {trans_type} - {amount} - {description} ===")
                     
+                    # Обробка дати
                     if isinstance(created_at, str):
-                        if '.' in created_at:
-                            date_time = datetime.strptime(created_at.split('.')[0], '%Y-%m-%d %H:%M:%S')
-                        else:
-                            date_time = datetime.strptime(created_at, '%Y-%m-%d %H:%M:%S')
+                        try:
+                            if 'T' in created_at:  # Формат з T
+                                date_time = datetime.strptime(created_at.replace('T', ' ').split('.')[0], '%Y-%m-%d %H:%M:%S')
+                            elif '.' in created_at:  # Формат з мілісекундами
+                                date_time = datetime.strptime(created_at.split('.')[0], '%Y-%m-%d %H:%M:%S')
+                            else:  # Простий формат
+                                date_time = datetime.strptime(created_at, '%Y-%m-%d %H:%M:%S')
+                        except ValueError as e:
+                            print(f"Помилка парсингу дати {created_at}: {e}")
+                            date_time = datetime.now()
                     else:
                         date_time = created_at
                     
                     date_str = date_time.strftime('%d.%m %H:%M')
 
-                    # ВИПРАВЛЕНА ЛОГІКА
-                    if trans_type in ('deposit', 'savings_return', 'card_deposit', 'savings_interest', 'savings_completed', 'transfer_in'):
+                    # ВИПРАВЛЕНА ЛОГІКА КОЛЬОРІВ
+                    if trans_type in ('deposit', 'savings_return', 'card_deposit', 'savings_interest', 'savings_completed', 'transfer_in', 'income'):
                         amount_color = SUCCESS_GREEN
                         sign = "+"
                         print(f"=== ДЕБАГ: Транзакція {trans_type} - ЗЕЛЕНИЙ (+) ===")
-                    elif trans_type in ('withdrawal', 'savings_deposit', 'transfer', 'transfer_out', 'savings_transfer'):
+                    elif trans_type in ('withdrawal', 'savings_deposit', 'transfer', 'transfer_out', 'savings_transfer', 'expense'):
                         amount_color = ERROR_RED
                         sign = "-"
                         print(f"=== ДЕБАГ: Транзакція {trans_type} - ЧЕРВОНИЙ (-) ===")
@@ -1233,7 +1237,9 @@ class HomeTab(Screen):
                     
                     # Додаємо фон для рядка
                     with trans_layout.canvas.before:
-                        Color(0.95, 0.95, 0.95, 1)
+                        # Чергування кольорів фону для кращої читабельності
+                        bg_color = (0.98, 0.98, 0.98, 1) if i % 2 == 0 else (0.95, 0.95, 0.95, 1)
+                        Color(*bg_color)
                         trans_layout.bg_rect = Rectangle(
                             pos=trans_layout.pos,
                             size=trans_layout.size
@@ -1254,15 +1260,15 @@ class HomeTab(Screen):
                     )
                     
                     desc_label = Label(
-                        text=description,
-                        size_hint_x=0.5,
+                        text=description[:20] + "..." if len(description) > 20 else description,
+                        size_hint_x=0.4,
                         color=DARK_TEXT,
                         font_size=dp(13)
                     )
                     
                     amount_label = Label(
-                        text=f"{sign}{amount:.2f} $",
-                        size_hint_x=0.2,
+                        text=f"{sign}{abs(amount):.2f} $",
+                        size_hint_x=0.3,
                         color=amount_color,
                         font_size=dp(13),
                         bold=True
@@ -1276,13 +1282,17 @@ class HomeTab(Screen):
                     print(f"=== ДЕБАГ: Додано транзакцію до інтерфейсу ===")
 
                 except Exception as e:
-                    print(f"Помилка обробки транзакції: {e}")
+                    print(f"Помилка обробки транзакції {i}: {e}")
+                    import traceback
+                    traceback.print_exc()
                     continue
 
             print(f"=== ДЕБАГ: Всього додано {len(history_container.children)} елементів до history_container ===")
 
         except Exception as e:
             print(f"Помилка завантаження історії: {e}")
+            import traceback
+            traceback.print_exc()
             error_label = Label(
                 text="Помилка завантаження історії",
                 color=ERROR_RED,

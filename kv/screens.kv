@@ -593,36 +593,156 @@
                     padding: [dp(10), dp(5), dp(10), dp(5)]
                     size_hint_x: 1
 <AnalyticsTab>:
-    name: "analytics_tab"
-    canvas.before:
-        Color:
-            rgba: LIGHT_BLUE
-        Rectangle:
-            pos: self.pos
-            size: self.size
-    
     BoxLayout:
         orientation: 'vertical'
-        padding: adaptive_padding(40)
-        spacing: adaptive_dp(20)
-        
-        LoginFormLogo:
-            height: adaptive_dp(120) if not is_small_screen else adaptive_dp(90)
-        
+        padding: dp(15)
+        spacing: dp(15)
+
         Label:
-            text: "Analytics"
-            font_size: adaptive_font(28) if not is_small_screen else adaptive_font(24)
+            text: 'Аналітика витрат'
+            font_size: dp(24)
             bold: True
-            color: PRIMARY_PINK
+            color: root.primary_pink
             size_hint_y: None
-            height: adaptive_dp(40)
-        
-        Label:
-            text: "Transaction history and charts will appear here"
-            font_size: adaptive_font(18) if not is_small_screen else adaptive_font(16)
-            color: PRIMARY_BLUE
-            halign: "center"
-            text_size: self.width, None
+            height: dp(40)
+
+        ScrollView:
+            do_scroll_x: False
+            do_scroll_y: True
+            scroll_type: ['bars', 'content']
+            bar_width: dp(8)
+            bar_color: root.primary_blue
+            effect_cls: 'ScrollEffect'  # Плавний скрол
+
+            BoxLayout:
+                orientation: 'vertical'
+                spacing: dp(20)
+                size_hint_y: None
+                height: self.minimum_height
+                padding: [0, 0, dp(5), 0]  # Місце для скролбару
+
+                # Секція створення конверту
+                BoxLayout:
+                    orientation: 'vertical'
+                    size_hint_y: None
+                    height: dp(110)
+                    spacing: dp(5)
+                    padding: [0, 0, 0, dp(5)]
+
+                    Label:
+                        text: 'Створити новий конверт'
+                        font_size: dp(18)
+                        bold: True
+                        color: root.dark_text
+                        size_hint_y: None
+                        height: dp(25)
+
+                    BoxLayout:
+                        orientation: 'horizontal'
+                        size_hint_y: None
+                        height: dp(40)
+                        spacing: dp(8)
+
+                        TextInput:
+                            id: envelope_name_input
+                            hint_text: 'Назва конверту'
+                            size_hint_x: 0.5
+                            font_size: dp(14)
+                            padding: [dp(10), dp(8)]
+                            background_color: root.white
+                            foreground_color: root.dark_text
+
+                        TextInput:
+                            id: envelope_budget_input
+                            hint_text: 'Бюджет ($)'
+                            size_hint_x: 0.3
+                            input_filter: 'float'
+                            font_size: dp(14)
+                            padding: [dp(10), dp(8)]
+                            background_color: root.white
+                            foreground_color: root.dark_text
+
+                        Button:
+                            text: 'Створити'
+                            size_hint_x: 0.2
+                            background_color: root.primary_pink
+                            color: root.white
+                            font_size: dp(12)
+                            bold: True
+                            on_press: root.create_envelope()
+
+                    Label:
+                        id: analytics_message
+                        text: ''
+                        font_size: dp(12)
+                        size_hint_y: None
+                        height: dp(20)
+
+                # Секція конвертів
+                BoxLayout:
+                    orientation: 'vertical'
+                    size_hint_y: None
+                    height: self.minimum_height
+                    spacing: dp(10)
+
+                    Label:
+                        text: 'Мої конверти'
+                        font_size: dp(18)
+                        bold: True
+                        color: root.dark_text
+                        size_hint_y: None
+                        height: dp(25)
+
+                    GridLayout:
+                        id: envelopes_container
+                        cols: 3
+                        spacing: dp(10)
+                        size_hint_y: None
+                        height: self.minimum_height
+
+                # Секція статистики
+                BoxLayout:
+                    orientation: 'vertical'
+                    size_hint_y: None
+                    height: self.minimum_height
+                    spacing: dp(10)
+
+                    Label:
+                        text: 'Статистика'
+                        font_size: dp(18)
+                        bold: True
+                        color: root.dark_text
+                        size_hint_y: None
+                        height: dp(25)
+
+                    GridLayout:
+                        id: stats_container
+                        cols: 2
+                        spacing: dp(10)
+                        size_hint_y: None
+                        height: self.minimum_height
+
+                # Секція діаграм
+                BoxLayout:
+                    orientation: 'vertical'
+                    size_hint_y: None
+                    height: self.minimum_height
+                    spacing: dp(10)
+
+                    Label:
+                        text: 'Візуалізація'
+                        font_size: dp(18)
+                        bold: True
+                        color: root.dark_text
+                        size_hint_y: None
+                        height: dp(25)
+
+                    BoxLayout:
+                        id: charts_container
+                        orientation: 'vertical'
+                        spacing: dp(10)
+                        size_hint_y: None
+                        height: self.minimum_height
 
 
 
