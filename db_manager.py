@@ -631,13 +631,14 @@ def update_card_balance(cursor, conn, card_id, amount, description=""):
         # Оновлюємо баланс
         cursor.execute("UPDATE user_cards SET balance = balance + ? WHERE id=?", (amount, card_id))
         
-        # Логуємо операцію
-        trans_type = 'deposit' if amount > 0 else 'withdrawal'
-        trans_description = f"Поповнення картки {card_name}" if amount > 0 else f"Зняття з картки {card_name}"
-        if description:
-            trans_description = description
-            
-        log_transaction(cursor, conn, user_id, trans_type, amount, trans_description, card_id)
+        # Логуємо операцію ТІЛЬКИ якщо це не поповнення конверту (щоб уникнути дублювання)
+        if not description.startswith("(") or "конверт" not in description.lower():
+            trans_type = 'deposit' if amount > 0 else 'withdrawal'
+            trans_description = f"Поповнення картки {card_name}" if amount > 0 else f"Зняття з картки {card_name}"
+            if description:
+                trans_description = description
+                
+            log_transaction(cursor, conn, user_id, trans_type, amount, trans_description, card_id)
         
         conn.commit()
         return True
@@ -739,36 +740,66 @@ def transfer_money_between_cards(cursor, conn, from_card_id, to_card_id, amount)
         print(f"Error transferring money: {e}")
         return False, "Помилка переказу"
 
-# Logging Functions
-def log_transaction(cursor, conn, user_id, trans_type, amount, description="", card_id=None):
-    """Log a transaction to the database."""
+def log_transaction(cursor, conn, user_id, transaction_type, amount, description="", card_id=None):
+    """Логування транзакції з уникненням дублювання"""
     try:
-        print(f"=== СПРОБА ЗАЛОГУВАТИ ТРАНЗАКЦІЮ ===")
-        print(f"user_id: {user_id}, type: {trans_type}, amount: {amount}, desc: {description}, card_id: {card_id}")
-        
-        # Не логуємо не фінансові операції
-        non_financial_types = ['login', 'logout', 'initial']
-        if trans_type in non_financial_types:
-            print("Пропускаємо не фінансову операцію")
-            return
+        # НЕ логуємо створення карток
+        if transaction_type == 'card_creation':
+            return True
             
-        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        print(f"Час: {timestamp}")
+        # Перевіряємо, чи не було вже схожої транзакції нещодавно
+        cursor.execute('''
+            SELECT COUNT(*) FROM transactions 
+            WHERE user_id=? AND type=? AND amount=? AND description=? 
+            AND created_at > datetime('now', '-1 minute')
+        ''', (user_id, transaction_type, amount, description))
         
-        cursor.execute(
-            "INSERT INTO transactions(user_id, type, amount, description, card_id, created_at) VALUES(?, ?, ?, ?, ?, ?)",
-            (user_id, trans_type, amount, description, card_id, timestamp)
-        )
+        recent_count = cursor.fetchone()[0]
+        
+        if recent_count > 0:
+            print(f"=== УВАГА: Знайдено {recent_count} схожих транзакцій за останню хвилину, пропускаємо ===")
+            return True
+            
+        # Додаємо транзакцію
+        cursor.execute('''
+            INSERT INTO transactions (user_id, type, amount, description, card_id, created_at)
+            VALUES (?, ?, ?, ?, ?, datetime('now'))
+        ''', (user_id, transaction_type, amount, description, card_id))
+        
         conn.commit()
-        
-        print(f"=== ТРАНЗАКЦІЮ УСПІШНО ЗАЛОГОВАНО ===")
-        
-        # Відразу перевіряємо
-        debug_transactions(cursor, user_id)
+        print(f"=== ТРАНЗАКЦІЮ УСПІШНО ЗАЛОГОВАНО === user_id: {user_id}, type: {transaction_type}, amount: {amount}")
+        return True
         
     except Exception as e:
-        print(f"=== ПОМИЛКА ЛОГУВАННЯ ТРАНЗАКЦІЇ: {e} ===")
-
+        print(f"Помилка логування транзакції: {e}")
+        return False
+    
+def update_envelope(cursor, conn, envelope_id, name=None, budget_limit=None):
+    """Update envelope information."""
+    try:
+        update_fields = []
+        params = []
+        
+        if name is not None:
+            update_fields.append("name=?")
+            params.append(name)
+        if budget_limit is not None:
+            update_fields.append("budget_limit=?")
+            params.append(budget_limit)
+            
+        if not update_fields:
+            return False
+            
+        update_query = f"UPDATE envelopes SET {', '.join(update_fields)} WHERE id=?"
+        params.append(envelope_id)
+        
+        cursor.execute(update_query, params)
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error updating envelope: {e}")
+        return False
+    
 def get_user_transactions(cursor, user_id, limit=50):
     """Get transaction history for user."""
     try:
@@ -999,6 +1030,7 @@ __all__ = [
     'update_card_balance', 'delete_user_card', 'update_user_card', 'transfer_money_between_cards',
     'safe_color_conversion',
     'create_envelope', 'get_user_envelopes', 'add_to_envelope', 'get_envelope_transactions', 'get_envelope_stats',
+    'update_envelope',  # ДОДАНО ЦЕ
     # Analytics functions
     'get_analytics_data', 'get_category_breakdown', 'get_top_categories', 
     'get_cards_analytics', 'get_budget_progress', 'get_insights_and_forecasts', 'get_monthly_comparison'

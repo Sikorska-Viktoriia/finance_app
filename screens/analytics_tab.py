@@ -11,7 +11,7 @@ from kivy.uix.widget import Widget
 from kivy.metrics import dp
 from kivy.clock import Clock
 from kivy.app import App
-from kivy.graphics import Color, Rectangle, RoundedRectangle, Ellipse, Triangle, Line
+from kivy.graphics import Color, Rectangle, RoundedRectangle, Ellipse, Line, Mesh
 from kivy.properties import ListProperty, NumericProperty, StringProperty
 import math
 from datetime import datetime, timedelta
@@ -22,7 +22,7 @@ from db_manager import (
     get_user_cards, get_envelope_transactions, get_envelope_stats,
     get_analytics_data, get_category_breakdown, get_top_categories,
     get_cards_analytics, get_budget_progress, get_insights_and_forecasts,
-    get_monthly_comparison
+    get_monthly_comparison, update_envelope
 )
 
 # Кольори
@@ -114,18 +114,38 @@ class CompactEnvelopeCard(BoxLayout):
             )
             self.add_widget(percent_label)
         
+        # Кнопки дій
+        buttons_layout = BoxLayout(
+            size_hint_y=None,
+            height=dp(28),
+            spacing=dp(5)
+        )
+        
         # Кнопка поповнення
         add_btn = Button(
             text='+',
-            size_hint_y=None,
-            height=dp(28),
+            size_hint_x=0.5,
             background_color=(1, 1, 1, 0.3),
             color=WHITE,
             font_size=dp(14),
             bold=True
         )
         add_btn.bind(on_press=self.on_add_money)
-        self.add_widget(add_btn)
+        buttons_layout.add_widget(add_btn)
+        
+        # Кнопка редагування
+        edit_btn = Button(
+            text='✎',
+            size_hint_x=0.5,
+            background_color=(1, 1, 1, 0.2),
+            color=WHITE,
+            font_size=dp(12),
+            bold=True
+        )
+        edit_btn.bind(on_press=self.on_edit)
+        buttons_layout.add_widget(edit_btn)
+        
+        self.add_widget(buttons_layout)
         
         if hasattr(self, 'progress_bg'):
             self.progress_bg.bind(pos=self._update_progress_bg, size=self._update_progress_bg)
@@ -169,6 +189,11 @@ class CompactEnvelopeCard(BoxLayout):
         """Обробка натискання кнопки поповнення"""
         if self.on_manage_callback:
             self.on_manage_callback(self.envelope_data, 'add')
+
+    def on_edit(self, instance):
+        """Обробка натискання кнопки редагування"""
+        if self.on_manage_callback:
+            self.on_manage_callback(self.envelope_data, 'edit')
 
 class StatCard(BoxLayout):
     """Картка статистики з покращеним дизайном"""
@@ -233,13 +258,13 @@ class StatCard(BoxLayout):
         self.bg_rect.pos = self.pos
         self.bg_rect.size = self.size
 
-class PieChartWidget(Widget):
-    """Кругова діаграма з правильним відображенням тексту"""
+class SimplePieChartWidget(Widget):
+    """Кругова діаграма з заповненими секторами та інтелектуальними легендами"""
     def __init__(self, data=None, **kwargs):
         super().__init__(**kwargs)
         self.data = data or []
         self.size_hint = (1, None)
-        self.height = dp(400)  # Збільшена висота для кращого відображення
+        self.height = dp(300)
         
         self.bind(pos=self.update_chart, size=self.update_chart)
     
@@ -251,7 +276,6 @@ class PieChartWidget(Widget):
     def update_chart(self, *args):
         """Оновити відображення діаграми"""
         self.canvas.clear()
-        # Видаляємо всі текстові мітки
         for child in self.children[:]:
             self.remove_widget(child)
         
@@ -264,134 +288,221 @@ class PieChartWidget(Widget):
             self.show_no_data()
             return
         
-        # Центр діаграми
-        center_x = self.center_x
-        center_y = self.center_y + dp(30)
-        radius = min(self.width * 0.3, self.height * 0.3)  # Адаптивний радіус
+        center_x = self.width / 2
+        center_y = self.height / 2
+        radius = min(self.width, self.height) * 0.35
         
-        start_angle = 0
+        start_angle = 90  # Починаємо з 12-ї години (90 градусів)
         
-        # Малюємо сектори діаграми
-        for item in self.data:
+        # Обходимо і малюємо сектори
+        for i, item in enumerate(self.data):
             percentage = item['amount'] / total
             angle = percentage * 360
             
-            # Малюємо сектор
-            self.draw_sector(center_x, center_y, radius, start_angle, start_angle + angle, item['color'])
+            # Kivy Ellipse малює проти годинникової стрілки,
+            # тому кінцевий кут має бути меншим за початковий
+            end_angle = start_angle - angle
             
-            # Додаємо текст всередині сектора (якщо сектор досить великий)
-            if percentage > 0.05:  # Мінімум 5% для відображення тексту
-                mid_angle = start_angle + angle / 2
-                text_radius = radius * 0.5  # Текст всередині сектора
-                text_x = center_x + text_radius * math.cos(math.radians(mid_angle))
-                text_y = center_y + text_radius * math.sin(math.radians(mid_angle))
-                
-                # Відсоток усередині сектора
-                percent_label = Label(
-                    text=f"{percentage:.1%}",
-                    pos=(text_x - dp(20), text_y - dp(8)),
-                    size=(dp(40), dp(16)),
-                    font_size=dp(11),
-                    color=WHITE,  # Білий текст для контрасту
-                    halign='center',
-                    bold=True
-                )
-                self.add_widget(percent_label)
+            # Малюємо заповнений сектор
+            self.draw_filled_sector(center_x, center_y, radius, end_angle, start_angle, item['color'])
             
-            start_angle += angle
+            # Новий початковий кут для наступного сектора
+            start_angle = end_angle
         
-        # Додаємо легенду
-        self.draw_legend()
+        # Потім додаємо легенди з уникненням перетинів
+        # Передаємо обчислені дані для легенд
+        self.draw_smart_legends(center_x, center_y, radius, total)
 
-    def draw_sector(self, cx, cy, radius, start_angle, end_angle, color):
-        """Малює сектор кругової діаграми"""
-        points = [cx, cy]  # Починаємо з центру
-        
-        # Додаємо точки по колу
-        steps = max(20, int((end_angle - start_angle) / 2))  # Більше кроків для гладкішого краю
-        for i in range(steps + 1):
-            angle = math.radians(start_angle + (end_angle - start_angle) * i / steps)
-            x = cx + radius * math.cos(angle)
-            y = cy + radius * math.sin(angle)
-            points.extend([x, y])
-        
-        # Замикаємо на центр
-        points.extend([cx, cy])
-        
-        # Малюємо багатокутник
+    def draw_filled_sector(self, cx, cy, radius, start_angle, end_angle, color):
+        """Малює заповнений сектор кругової діаграми, використовуючи Ellipse."""
         with self.canvas:
             Color(*color)
-            Triangle(points=points)
-            
-            # Контур сектора
-            Color(0, 0, 0, 0.3)  # Темний контур
-            Line(points=points[:2] + points[2:-2], width=1, close=False)
-
-    def draw_legend(self):
-        """Малює легенду діаграми"""
-        legend_x = self.x + dp(20)
-        legend_y = self.y + self.height - dp(50)
-        
-        # Заголовок легенди
-        title_label = Label(
-            text="Розподіл коштів:",
-            pos=(legend_x, legend_y),
-            size=(self.width - dp(40), dp(25)),
-            font_size=dp(14),
-            bold=True,
-            color=DARK_TEXT,
-            halign='left'
-        )
-        self.add_widget(title_label)
-        
-        legend_y -= dp(35)
-        
-        # Елементи легенди
-        total = sum(item['amount'] for item in self.data)
-        for item in self.data:
-            if legend_y < self.y + dp(30):
-                break
-                
-            # Квадратик кольору
-            with self.canvas:
-                Color(*item['color'])
-                Rectangle(
-                    pos=(legend_x, legend_y),
-                    size=(dp(16), dp(16))
-                )
-            
-            # Текст легенди з сумою та відсотком
-            percentage = (item['amount'] / total) * 100
-            text = f"{item['name']}: ${item['amount']:.2f} ({percentage:.1f}%)"
-            
-            text_label = Label(
-                text=text,
-                pos=(legend_x + dp(22), legend_y - dp(4)),
-                size=(self.width - legend_x - dp(30), dp(20)),
-                font_size=dp(12),
-                color=DARK_TEXT,
-                halign='left'
+            Ellipse(
+                pos=(cx - radius, cy - radius),
+                size=(radius * 2, radius * 2),
+                angle_start=start_angle,
+                angle_end=end_angle # end_angle < start_angle
             )
-            self.add_widget(text_label)
+
+    def draw_smart_legends(self, cx, cy, radius, total):
+        """
+        ВИПРАВЛЕНО: Обчислення середнього кута для легенд,
+        що відповідає обходу проти годинникової стрілки.
+        """
+        legend_positions = []
+        
+        # Починаємо з тієї ж точки, що і для малювання секторів
+        current_angle = 90
+        
+        for i, item in enumerate(self.data):
+            percentage = item['amount'] / total
+            angle = percentage * 360
             
-            legend_y -= dp(25)
+            # Пропускаємо дуже малі сектори (< 1 градус)
+            if angle < 1:
+                current_angle -= angle
+                continue
+                
+            # mid_angle тепер знаходиться між поточним current_angle
+            # та кутом, який буде current_angle - angle (кінцевий кут сектора)
+            
+            # ВИПРАВЛЕННЯ: Середній кут = Поточний_кут - Половина_ширини_сектора
+            mid_angle = current_angle - angle / 2
+            
+            # Визначаємо оптимальну позицію для легенди
+            text_pos, line_points = self.find_best_legend_position(
+                cx, cy, radius, mid_angle, legend_positions, item
+            )
+            
+            if text_pos:
+                # ... (Малювання лінії та тексту залишається без змін) ...
+                with self.canvas:
+                    Color(*item['color'])
+                    Line(points=line_points, width=dp(1.2))
+                
+                self.add_legend_text(text_pos, item, percentage)
+                legend_positions.append(text_pos)
+            
+            # Переходимо до наступного сектора
+            current_angle -= angle
+
+    def draw_smart_legends(self, cx, cy, radius, total):
+        """Малює інтелектуальні легенди з уникненням перетинів"""
+        legend_positions = []  # Для відстеження позицій легенд
+        
+        start_angle = 90
+        
+        for i, item in enumerate(self.data):
+            percentage = item['amount'] / total
+            angle = percentage * 360
+            
+            # Пропускаємо дуже малі сектори (< 1 градус)
+            if angle < 1:
+                start_angle -= angle
+                continue
+                
+            # Кут середини сектору
+            mid_angle = start_angle - angle / 2
+            
+            # Визначаємо оптимальну позицію для легенди
+            text_pos, line_points = self.find_best_legend_position(
+                cx, cy, radius, mid_angle, legend_positions, item
+            )
+            
+            if text_pos:
+                # Малюємо лінію
+                with self.canvas:
+                    Color(*item['color'])
+                    Line(points=line_points, width=dp(1.2))
+                
+                # Додаємо текст
+                self.add_legend_text(text_pos, item, percentage)
+                legend_positions.append(text_pos)
+            
+            start_angle -= angle # Переходимо до наступного сектора
+
+    def find_best_legend_position(self, cx, cy, radius, angle, existing_positions, item):
+        """
+        ВИПРАВЛЕННЯ 3: Знаходить найкращу позицію для легенди з контрольованою довжиною.
+        """
+        angle_rad = math.radians(angle)
+        
+        # ЗМЕНШЕНО: Використовуємо менші множники для коротших ліній
+        distances = [1.1, 1.25, 1.4, 1.55] 
+        max_text_radius = radius * 1.6 # Обмежуємо максимальну довжину
+        
+        for distance_multiplier in distances:
+            text_radius = radius * distance_multiplier
+            
+            # Обмежуємо радіус, щоб лінії не виходили занадто далеко
+            text_radius = min(text_radius, max_text_radius)
+            
+            text_x = cx + text_radius * math.cos(angle_rad)
+            text_y = cy + text_radius * math.sin(angle_rad)
+            
+            # Перевіряємо, чи не перетинається з існуючими легендами
+            if not self.check_collision((text_x, text_y), existing_positions, dp(45)):
+                # Точки для лінії: Edge -> Mid Point -> Text Position
+                edge_x = cx + radius * math.cos(angle_rad)
+                edge_y = cy + radius * math.sin(angle_rad)
+                
+                # Проміжна точка для згладжування лінії (виносимо трохи за радіус)
+                mid_radius = radius * 1.05
+                mid_x = cx + mid_radius * math.cos(angle_rad)
+                mid_y = cy + mid_radius * math.sin(angle_rad)
+                
+                line_points = [edge_x, edge_y, mid_x, mid_y, text_x, text_y]
+                return (text_x, text_y), line_points
+        
+        return None, None
+
+    def check_collision(self, new_pos, existing_positions, min_distance):
+        """Перевіряє колізії з існуючими легендами"""
+        for pos in existing_positions:
+            distance = math.sqrt((new_pos[0] - pos[0])**2 + (new_pos[1] - pos[1])**2)
+            if distance < min_distance:
+                return True
+        return False
+
+    def add_legend_text(self, position, item, percentage):
+        """Додає текст легенди з правильним вирівнюванням"""
+        text_x, text_y = position
+        
+        # Визначаємо вирівнювання на основі позиції
+        # Використовуємо self.width / 2 для halign
+        halign = 'left' if text_x >= self.width / 2 else 'right'
+        valign = 'bottom' if text_y > self.height / 2 else 'top'
+        
+        # Компактний формат тексту
+        text_content = f"{item['name']}\n({percentage:.1f}%)"
+        if percentage * 100 > 5:  # Для більших секторів показуємо суму
+            text_content = f"{item['name']}\n${item['amount']:.2f}\n({percentage:.1f}%)"
+            text_height = dp(36)
+        else:  # Для малих секторів - компактніше
+            text_height = dp(28)
+        
+        text_width = dp(65)
+        
+        # Коригуємо позицію для вирівнювання
+        pos_x = text_x if halign == 'left' else text_x - text_width
+        pos_y = text_y if valign == 'bottom' else text_y - text_height
+        
+        # Перевіряємо, чи текст не виходить за межі віджета
+        pos_x = max(dp(5), min(pos_x, self.width - text_width - dp(5)))
+        pos_y = max(dp(5), min(pos_y, self.height - text_height - dp(5)))
+        
+        text_label = Label(
+            text=text_content,
+            pos=(pos_x, pos_y),
+            size=(text_width, text_height),
+            font_size=dp(8),
+            color=DARK_TEXT,
+            halign=halign,
+            valign=valign,
+            text_size=(text_width, None)
+        )
+        self.add_widget(text_label)
 
     def show_no_data(self):
         """Показати повідомлення про відсутність даних"""
+        center_x = self.width / 2
+        center_y = self.height / 2
+        
         with self.canvas:
             Color(*LIGHT_GRAY)
             Ellipse(
-                pos=(self.center_x - dp(60), self.center_y - dp(30)), 
-                size=(dp(120), dp(120))
+                pos=(center_x - dp(40), center_y - dp(40)), 
+                size=(dp(80), dp(80))
             )
         
         no_data_label = Label(
-            text="Немає даних для відображення",
-            pos=(self.center_x - dp(90), self.center_y - dp(10)),
-            size=(dp(180), dp(20)),
-            font_size=dp(14),
+            text="Немає даних\nдля відображення",
+            pos=(center_x - dp(60), center_y - dp(20)),
+            size=(dp(120), dp(40)),
+            font_size=dp(12),
             color=DARK_GRAY,
-            halign='center'
+            halign='center',
+            valign='middle'
         )
         self.add_widget(no_data_label)
 
@@ -650,41 +761,154 @@ class AnalyticsTab(Screen):
         container.clear_widgets()
         
         # Основний контейнер для діаграми
-        charts_main_layout = BoxLayout(orientation='vertical', spacing=dp(10), size_hint_y=None, height=dp(450))
+        charts_main_layout = BoxLayout(orientation='vertical', spacing=dp(5), size_hint_y=None, height=dp(350))
         
         if self.envelopes_for_chart:
             # Заголовок діаграми
+            # ВИПРАВЛЕННЯ: Додамо 'Візуалізація' як на зображенні
+            vis_label = Label(
+                text="Візуалізація",
+                font_size=dp(18),
+                bold=True,
+                color=DARK_TEXT,
+                size_hint_y=None,
+                height=dp(25)
+            )
+            charts_main_layout.add_widget(vis_label)
+            
             title_label = Label(
-                text="Розподіл коштів по конвертах та заощадженнях",
+                text="Розподіл коштів по конвертах",
                 font_size=dp(16),
                 bold=True,
                 color=DARK_TEXT,
                 size_hint_y=None,
-                height=dp(30)
+                height=dp(25)
             )
             charts_main_layout.add_widget(title_label)
             
             # Кругова діаграма
-            pie_chart = PieChartWidget(self.envelopes_for_chart)
-            pie_chart.size_hint_y = 0.9
+            # ВИПРАВЛЕННЯ: Використовуємо виправлений клас SimplePieChartWidget
+            pie_chart = SimplePieChartWidget(self.envelopes_for_chart)
+            pie_chart.size_hint_y = 1
             charts_main_layout.add_widget(pie_chart)
         else:
-            no_data_section = BoxLayout(orientation='vertical', size_hint_y=1)
-            no_data_section.add_widget(Label(
+            no_data_label = Label(
                 text="Немає даних для відображення діаграми",
                 font_size=dp(14),
                 color=DARK_GRAY,
                 size_hint_y=None,
                 height=dp(40)
-            ))
-            charts_main_layout.add_widget(no_data_section)
+            )
+            charts_main_layout.add_widget(no_data_label)
         
         container.add_widget(charts_main_layout)
     
+
+
     def on_envelope_action(self, envelope_data, action):
         """Обробка дій з конвертом"""
         if action == 'add':
             self.show_add_money_modal(envelope_data)
+        elif action == 'edit':
+            self.show_edit_envelope_modal(envelope_data)
+    
+    def show_edit_envelope_modal(self, envelope_data):
+        """Показати модальне вікно редагування конверту"""
+        content = BoxLayout(orientation='vertical', spacing=dp(12), padding=dp(15))
+        
+        title = Label(
+            text=f"Редагування: {envelope_data['name']}",
+            font_size=dp(18),
+            bold=True,
+            color=DARK_TEXT,
+            size_hint_y=None,
+            height=dp(35)
+        )
+        content.add_widget(title)
+        
+        # Назва конверту
+        name_input = TextInput(
+            text=envelope_data['name'],
+            hint_text="Назва конверту",
+            size_hint_y=None,
+            height=dp(40)
+        )
+        content.add_widget(name_input)
+        
+        # Бюджет
+        budget_input = TextInput(
+            text=str(envelope_data['budget_limit']) if envelope_data['budget_limit'] > 0 else "",
+            hint_text="Бюджет (не обов'язково)",
+            input_filter='float',
+            size_hint_y=None,
+            height=dp(40)
+        )
+        content.add_widget(budget_input)
+        
+        error_label = Label(
+            text="",
+            color=ERROR_RED,
+            size_hint_y=None,
+            height=dp(25)
+        )
+        content.add_widget(error_label)
+        
+        buttons_layout = BoxLayout(size_hint_y=None, height=dp(40), spacing=dp(8))
+        
+        cancel_btn = Button(
+            text="Скасувати",
+            background_color=LIGHT_GRAY,
+            color=DARK_TEXT
+        )
+        
+        save_btn = Button(
+            text="Зберегти",
+            background_color=SUCCESS_GREEN,
+            color=WHITE
+        )
+        
+        def save_changes(instance):
+            new_name = name_input.text.strip()
+            budget_text = budget_input.text.strip()
+            
+            if not new_name:
+                error_label.text = "Введіть назву конверту"
+                return
+            
+            try:
+                new_budget = float(budget_text) if budget_text else 0.0
+                
+                # Оновлюємо конверт в базі даних
+                success = update_envelope(
+                    cursor, conn,
+                    envelope_data['id'],
+                    name=new_name,
+                    budget_limit=new_budget
+                )
+                
+                if success:
+                    popup.dismiss()
+                    self.load_data()
+                    self.show_success_message(f"Конверт '{new_name}' успішно оновлено!")
+                else:
+                    error_label.text = "Помилка при оновленні конверту"
+                    
+            except ValueError:
+                error_label.text = "Введіть коректну суму бюджету"
+        
+        cancel_btn.bind(on_press=lambda x: popup.dismiss())
+        save_btn.bind(on_press=save_changes)
+        
+        buttons_layout.add_widget(cancel_btn)
+        buttons_layout.add_widget(save_btn)
+        content.add_widget(buttons_layout)
+        
+        popup = Popup(
+            title='Редагування конверту',
+            content=content,
+            size_hint=(0.85, 0.5)
+        )
+        popup.open()
     
     def create_envelope(self):
         """Створити новий конверт"""
@@ -735,6 +959,7 @@ class AnalyticsTab(Screen):
                 message_label.color = SUCCESS_GREEN
                 name_input.text = ""
                 budget_input.text = ""
+                # Миттєве оновлення
                 self.load_data()
             else:
                 message_label.text = "Помилка створення конверту"
@@ -889,3 +1114,30 @@ class AnalyticsTab(Screen):
         except Exception as e:
             print(f"Помилка поповнення конверту: {e}")
             return False
+    
+    def show_success_message(self, message):
+        """Показати повідомлення про успіх"""
+        content = BoxLayout(orientation='vertical', spacing=dp(15), padding=dp(20))
+        
+        content.add_widget(Label(
+            text=message, 
+            color=SUCCESS_GREEN,
+            font_size=dp(16)
+        ))
+        
+        ok_btn = Button(
+            text='OK',
+            size_hint_y=None,
+            height=dp(40),
+            background_color=PRIMARY_BLUE,
+            color=WHITE
+        )
+        ok_btn.bind(on_press=lambda x: popup.dismiss())
+        content.add_widget(ok_btn)
+        
+        popup = Popup(
+            title='Успіх',
+            content=content,
+            size_hint=(0.6, 0.3)
+        )
+        popup.open()
