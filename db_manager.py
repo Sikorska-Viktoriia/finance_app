@@ -4,6 +4,9 @@ from datetime import datetime, timedelta
 import re
 import os
 import json
+import string
+import secrets
+from cryptography.fernet import Fernet
 
 # -----------------------
 # Database Initialization
@@ -11,17 +14,101 @@ import json
 DB_NAME = "users.db"
 SALT = "flamingo_secure_salt_2024"
 
+# Генерація ключа для шифрування
+def generate_encryption_key():
+    """Генерує ключ шифрування та зберігає його у файлі"""
+    key_file = "encryption.key"
+    if os.path.exists(key_file):
+        with open(key_file, 'rb') as f:
+            return f.read()
+    else:
+        key = Fernet.generate_key()
+        with open(key_file, 'wb') as f:
+            f.write(key)
+        return key
+
+# Ініціалізація шифрування
+ENCRYPTION_KEY = generate_encryption_key()
+cipher_suite = Fernet(ENCRYPTION_KEY)
+
+def generate_unique_user_id():
+    """Генерує унікальний випадковий ID для користувача формату U + 5 випадкових символів"""
+    while True:
+        # Генеруємо ID формату U + 5 випадкових символів (букви та цифри)
+        characters = string.ascii_uppercase + string.digits
+        user_id = 'U' + ''.join(secrets.choice(characters) for _ in range(5))
+        
+        # Перевіряємо унікальність
+        cursor.execute("SELECT COUNT(*) FROM users WHERE id=?", (user_id,))
+        if cursor.fetchone()[0] == 0:
+            return user_id
+
+def generate_unique_card_id():
+    """Генерує унікальний випадковий ID для картки формату C + 5 випадкових символів"""
+    while True:
+        characters = string.ascii_uppercase + string.digits
+        card_id = 'C' + ''.join(secrets.choice(characters) for _ in range(5))
+        
+        # Перевіряємо унікальність
+        cursor.execute("SELECT COUNT(*) FROM user_cards WHERE id=?", (card_id,))
+        if cursor.fetchone()[0] == 0:
+            return card_id
+
+def encrypt_data(data):
+    """Шифрує дані"""
+    if data is None:
+        return None
+    return cipher_suite.encrypt(data.encode()).decode()
+
+def decrypt_data(encrypted_data):
+    """Розшифровує дані"""
+    if encrypted_data is None:
+        return None
+    try:
+        return cipher_suite.decrypt(encrypted_data.encode()).decode()
+    except:
+        return None
+
+def hash_email(email):
+    """Хешує email адресу для зберігання в базі даних"""
+    return hashlib.sha256((email + SALT).encode('utf-8')).hexdigest()
+
+def hash_card_number(card_number):
+    """Хешує номер картки для зберігання в базі даних"""
+    return hashlib.sha256((card_number + SALT).encode('utf-8')).hexdigest()
+
+def hash_balance(balance):
+    """Хешує баланс картки для перевірки цілісності"""
+    balance_str = f"{balance:.2f}"
+    return hashlib.sha256((balance_str + SALT).encode('utf-8')).hexdigest()
+
+def mask_card_number(card_number):
+    """Маскує номер картки, показуючи тільки останні 4 цифри"""
+    if not card_number:
+        return "**** **** **** ****"
+    
+    # Видаляємо всі пробіли та нецифрові символи
+    clean_number = re.sub(r'\D', '', str(card_number))
+    
+    if len(clean_number) < 4:
+        return "**** **** **** ****"
+    
+    # Показуємо тільки останні 4 цифри
+    last_four = clean_number[-4:]
+    return f"**** **** **** {last_four}"
+
 def init_database():
     """Initializes and returns database connection and cursor."""
     conn = sqlite3.connect(DB_NAME, check_same_thread=False)
     cursor = conn.cursor()
 
-    # Users table
+    # Users table - змінено ID на TEXT для унікальних ID
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id TEXT PRIMARY KEY,
             username TEXT NOT NULL,
-            email TEXT UNIQUE NOT NULL,
+            email_hash TEXT UNIQUE NOT NULL,
+            email_encrypted TEXT NOT NULL,
             password TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -32,8 +119,9 @@ def init_database():
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS wallets(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
+            user_id TEXT NOT NULL,
             balance REAL DEFAULT 0.0,
+            balance_hash TEXT NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users (id)
@@ -44,26 +132,28 @@ def init_database():
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS transactions(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
+            user_id TEXT NOT NULL,
             type TEXT NOT NULL,
             amount REAL NOT NULL,
             description TEXT,
-            card_id INTEGER,
+            card_id TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users (id),
             FOREIGN KEY (card_id) REFERENCES user_cards (id)
         )
     ''')
 
-    # User cards table
+    # User cards table - змінено ID на TEXT для унікальних ID
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS user_cards(
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
             name TEXT NOT NULL,
-            number TEXT NOT NULL,
+            number_hash TEXT NOT NULL,
+            number_encrypted TEXT NOT NULL,
             bank TEXT NOT NULL,
             balance REAL DEFAULT 0.0,
+            balance_hash TEXT NOT NULL,
             color TEXT DEFAULT '[0.2, 0.4, 0.8, 1]',
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users (id)
@@ -74,7 +164,7 @@ def init_database():
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS savings_plans(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
+            user_id TEXT NOT NULL,
             name TEXT NOT NULL,
             target_amount REAL NOT NULL,
             current_amount REAL DEFAULT 0.0,
@@ -90,7 +180,7 @@ def init_database():
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS savings_transactions(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
+            user_id TEXT NOT NULL,
             plan_id INTEGER NOT NULL,
             amount REAL NOT NULL,
             type TEXT NOT NULL,
@@ -105,7 +195,7 @@ def init_database():
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS envelopes(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
+            user_id TEXT NOT NULL,
             name TEXT NOT NULL,
             color TEXT DEFAULT '[0.2, 0.4, 0.8, 1]',
             budget_limit REAL DEFAULT 0.0,
@@ -119,11 +209,11 @@ def init_database():
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS envelope_transactions(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
+            user_id TEXT NOT NULL,
             envelope_id INTEGER NOT NULL,
             amount REAL NOT NULL,
             description TEXT,
-            card_id INTEGER,
+            card_id TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users (id),
             FOREIGN KEY (envelope_id) REFERENCES envelopes (id),
@@ -142,8 +232,35 @@ def fix_database_schema(conn, cursor):
         columns = [column[1] for column in cursor.fetchall()]
         
         if 'card_id' not in columns:
-            cursor.execute("ALTER TABLE transactions ADD COLUMN card_id INTEGER")
+            cursor.execute("ALTER TABLE transactions ADD COLUMN card_id TEXT")
             print("Додано колонку card_id до таблиці transactions")
+        
+        # Перевіряємо нові колонки для хешування
+        cursor.execute("PRAGMA table_info(users)")
+        user_columns = [column[1] for column in cursor.fetchall()]
+        
+        if 'email_hash' not in user_columns:
+            cursor.execute("ALTER TABLE users ADD COLUMN email_hash TEXT")
+            print("Додано колонку email_hash до таблиці users")
+            
+        if 'email_encrypted' not in user_columns:
+            cursor.execute("ALTER TABLE users ADD COLUMN email_encrypted TEXT")
+            print("Додано колонку email_encrypted до таблиці users")
+        
+        cursor.execute("PRAGMA table_info(user_cards)")
+        card_columns = [column[1] for column in cursor.fetchall()]
+        
+        if 'number_hash' not in card_columns:
+            cursor.execute("ALTER TABLE user_cards ADD COLUMN number_hash TEXT")
+            print("Додано колонку number_hash до таблиці user_cards")
+            
+        if 'number_encrypted' not in card_columns:
+            cursor.execute("ALTER TABLE user_cards ADD COLUMN number_encrypted TEXT")
+            print("Додано колонку number_encrypted до таблиці user_cards")
+            
+        if 'balance_hash' not in card_columns:
+            cursor.execute("ALTER TABLE user_cards ADD COLUMN balance_hash TEXT")
+            print("Додано колонку balance_hash до таблиці user_cards")
         
         conn.commit()
         print("Схема бази даних оновлена успішно")
@@ -185,6 +302,118 @@ def safe_color_conversion(color):
             except:
                 return [0.2, 0.4, 0.8, 1]
     return [0.2, 0.4, 0.8, 1]
+
+# User Management Functions
+def create_user(cursor, conn, username, email, password):
+    """Створює нового користувача з унікальним ID"""
+    try:
+        if not is_valid_email(email):
+            return None, "Невірний формат email"
+        
+        if not is_valid_password(password):
+            return None, "Пароль має містити принаймні 6 символів"
+        
+        # Генеруємо унікальний ID
+        user_id = generate_unique_user_id()
+        
+        # Хешуємо та шифруємо email
+        email_hash = hash_email(email)
+        email_encrypted = encrypt_data(email)
+        
+        # Хешуємо пароль
+        password_hashed = hash_password(password)
+        
+        # Перевіряємо унікальність email
+        cursor.execute("SELECT COUNT(*) FROM users WHERE email_hash=?", (email_hash,))
+        if cursor.fetchone()[0] > 0:
+            return None, "Користувач з таким email вже існує"
+        
+        # Додаємо користувача
+        cursor.execute(
+            "INSERT INTO users (id, username, email_hash, email_encrypted, password) VALUES (?, ?, ?, ?, ?)",
+            (user_id, username, email_hash, email_encrypted, password_hashed)
+        )
+        
+        # Створюємо гаманець для користувача
+        balance_hash = hash_balance(0.0)
+        cursor.execute(
+            "INSERT INTO wallets (user_id, balance, balance_hash) VALUES (?, ?, ?)",
+            (user_id, 0.0, balance_hash)
+        )
+        
+        conn.commit()
+        return user_id, "Користувача успішно створено"
+        
+    except Exception as e:
+        print(f"Помилка створення користувача: {e}")
+        return None, "Помилка створення користувача"
+
+def verify_user_credentials(email, password):
+    """Перевіряє правильність email та пароля"""
+    try:
+        user = get_user_by_email(email)
+        if user and check_password(password, user['password']):
+            return user
+        return None
+    except Exception as e:
+        print(f"Помилка перевірки облікових даних: {e}")
+        return None
+
+def get_user_by_email(email):
+    """Отримує користувача за email"""
+    try:
+        email_hash = hash_email(email)
+        cursor.execute(
+            "SELECT id, username, email_encrypted, password FROM users WHERE email_hash=?",
+            (email_hash,)
+        )
+        user = cursor.fetchone()
+        
+        if user:
+            user_id, username, email_encrypted, password = user
+            email_decrypted = decrypt_data(email_encrypted)
+            return {
+                'id': user_id,
+                'username': username,
+                'email': email_decrypted,
+                'password': password
+            }
+        return None
+    except Exception as e:
+        print(f"Помилка отримання користувача: {e}")
+        return None
+
+def verify_card_integrity(cursor, card_id):
+    """Перевіряє цілісність даних картки"""
+    try:
+        cursor.execute(
+            "SELECT balance, balance_hash FROM user_cards WHERE id=?",
+            (card_id,)
+        )
+        result = cursor.fetchone()
+        
+        if result:
+            balance, stored_hash = result
+            calculated_hash = hash_balance(balance)
+            return stored_hash == calculated_hash
+        return False
+    except Exception as e:
+        print(f"Помилка перевірки цілісності картки: {e}")
+        return False
+
+def update_card_balance_integrity(cursor, conn, card_id, new_balance):
+    """Оновлює баланс картки з перевіркою цілісності"""
+    try:
+        balance_hash = hash_balance(new_balance)
+        cursor.execute(
+            "UPDATE user_cards SET balance=?, balance_hash=? WHERE id=?",
+            (new_balance, balance_hash, card_id)
+        )
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Помилка оновлення балансу картки: {e}")
+        return False
 
 # Analytics Functions
 def get_analytics_data(cursor, user_id, period='month', category=None, card_id=None):
@@ -530,21 +759,30 @@ def get_monthly_comparison(cursor, user_id, months=6):
 
 # Card Management Functions
 def create_user_card(cursor, conn, user_id, name, number, bank, balance=0.0, color=None):
-    """Create a new card for user."""
+    """Create a new card for user with unique ID and hashed data."""
     try:
+        # Генеруємо унікальний ID для картки
+        card_id = generate_unique_card_id()
+        
+        # Хешуємо та шифруємо номер картки
+        number_hash = hash_card_number(number)
+        number_encrypted = encrypt_data(number)
+        
+        # Хешуємо баланс
+        balance_hash = hash_balance(balance)
+        
         if color is None:
             color = '[0.2, 0.4, 0.8, 1]'
         elif isinstance(color, list):
             color = json.dumps(color)
             
         cursor.execute(
-            "INSERT INTO user_cards (user_id, name, number, bank, balance, color) VALUES (?, ?, ?, ?, ?, ?)",
-            (user_id, name, number, bank, balance, color)
+            "INSERT INTO user_cards (id, user_id, name, number_hash, number_encrypted, bank, balance, balance_hash, color) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (card_id, user_id, name, number_hash, number_encrypted, bank, balance, balance_hash, color)
         )
         conn.commit()
         
         # Логуємо створення картки
-        card_id = cursor.lastrowid
         log_transaction(cursor, conn, user_id, 'card_creation', 0, f"Створено картку {name}", card_id)
         
         return card_id
@@ -556,18 +794,24 @@ def get_user_cards(cursor, user_id):
     """Get all cards for a user."""
     try:
         cursor.execute(
-            "SELECT id, name, number, bank, balance, color FROM user_cards WHERE user_id=?",
+            "SELECT id, name, number_encrypted, bank, balance, color FROM user_cards WHERE user_id=?",
             (user_id,)
         )
         cards = cursor.fetchall()
         
         result = []
         for card in cards:
-            card_id, name, number, bank, balance, color = card
+            card_id, name, number_encrypted, bank, balance, color = card
+            
+            # Розшифровуємо номер картки та маскуємо його
+            full_number = decrypt_data(number_encrypted)
+            masked_number = mask_card_number(full_number)
+            
             result.append({
                 'id': card_id,
                 'name': name,
-                'number': number,
+                'number': masked_number,  # Маскований номер для відображення
+                'full_number': full_number,  # Повний номер тільки для внутрішнього використання
                 'bank': bank,
                 'balance': balance,
                 'color': safe_color_conversion(color)
@@ -582,17 +826,23 @@ def get_user_card_by_id(cursor, card_id):
     """Get specific card by ID."""
     try:
         cursor.execute(
-            "SELECT id, name, number, bank, balance, color FROM user_cards WHERE id=?",
+            "SELECT id, name, number_encrypted, bank, balance, color FROM user_cards WHERE id=?",
             (card_id,)
         )
         card = cursor.fetchone()
         
         if card:
-            card_id, name, number, bank, balance, color = card
+            card_id, name, number_encrypted, bank, balance, color = card
+            
+            # Розшифровуємо номер картки та маскуємо його
+            full_number = decrypt_data(number_encrypted)
+            masked_number = mask_card_number(full_number)
+            
             return {
                 'id': card_id,
                 'name': name,
-                'number': number,
+                'number': masked_number,  # Маскований номер для відображення
+                'full_number': full_number,  # Повний номер тільки для внутрішнього використання
                 'bank': bank,
                 'balance': balance,
                 'color': safe_color_conversion(color)
@@ -617,19 +867,21 @@ def get_total_balance(cursor, user_id):
         return 0.0
 
 def update_card_balance(cursor, conn, card_id, amount, description=""):
-    """Update card balance by adding amount."""
+    """Update card balance by adding amount with integrity check."""
     try:
         # Отримуємо інформацію про картку
-        cursor.execute("SELECT user_id, name FROM user_cards WHERE id=?", (card_id,))
+        cursor.execute("SELECT user_id, name, balance FROM user_cards WHERE id=?", (card_id,))
         card_info = cursor.fetchone()
         
         if not card_info:
             return False
             
-        user_id, card_name = card_info
+        user_id, card_name, current_balance = card_info
+        new_balance = current_balance + amount
         
-        # Оновлюємо баланс
-        cursor.execute("UPDATE user_cards SET balance = balance + ? WHERE id=?", (amount, card_id))
+        # Оновлюємо баланс з перевіркою цілісності
+        if not update_card_balance_integrity(cursor, conn, card_id, new_balance):
+            return False
         
         # Логуємо операцію ТІЛЬКИ якщо це не поповнення конверту (щоб уникнути дублювання)
         if not description.startswith("(") or "конверт" not in description.lower():
@@ -640,7 +892,6 @@ def update_card_balance(cursor, conn, card_id, amount, description=""):
                 
             log_transaction(cursor, conn, user_id, trans_type, amount, trans_description, card_id)
         
-        conn.commit()
         return True
     except Exception as e:
         print(f"Error updating card balance: {e}")
@@ -676,14 +927,16 @@ def update_user_card(cursor, conn, card_id, name=None, number=None, bank=None, b
             update_fields.append("name=?")
             params.append(name)
         if number is not None:
-            update_fields.append("number=?")
-            params.append(number)
+            update_fields.append("number_hash=?, number_encrypted=?")
+            params.append(hash_card_number(number))
+            params.append(encrypt_data(number))
         if bank is not None:
             update_fields.append("bank=?")
             params.append(bank)
         if balance is not None:
-            update_fields.append("balance=?")
+            update_fields.append("balance=?, balance_hash=?")
             params.append(balance)
+            params.append(hash_balance(balance))
         if color is not None:
             update_fields.append("color=?")
             if isinstance(color, list):
@@ -725,16 +978,23 @@ def transfer_money_between_cards(cursor, conn, from_card_id, to_card_id, amount)
         if from_balance < amount:
             return False, "Недостатньо коштів на картці"
         
-        # Знімаємо гроші з відправника
-        cursor.execute("UPDATE user_cards SET balance = balance - ? WHERE id=?", (amount, from_card_id))
-        # Додаємо гроші отримувачу
-        cursor.execute("UPDATE user_cards SET balance = balance + ? WHERE id=?", (amount, to_card_id))
+        # Оновлюємо баланси з перевіркою цілісності
+        new_from_balance = from_balance - amount
+        new_to_balance_result = cursor.execute("SELECT balance FROM user_cards WHERE id=?", (to_card_id,)).fetchone()
+        new_to_balance = (new_to_balance_result[0] if new_to_balance_result else 0) + amount
+        
+        if not update_card_balance_integrity(cursor, conn, from_card_id, new_from_balance):
+            return False, "Помилка оновлення балансу відправника"
+        
+        if not update_card_balance_integrity(cursor, conn, to_card_id, new_to_balance):
+            # Відкатуємо зміни, якщо щось пішло не так
+            update_card_balance_integrity(cursor, conn, from_card_id, from_balance)
+            return False, "Помилка оновлення балансу отримувача"
         
         # Логуємо переказ
         log_transaction(cursor, conn, from_user_id, 'transfer_out', -amount, f"Переказ на картку {to_card_name}", from_card_id)
         log_transaction(cursor, conn, to_user_id, 'transfer_in', amount, f"Переказ з картки {from_card_name}", to_card_id)
         
-        conn.commit()
         return True, "Переказ успішний"
     except Exception as e:
         print(f"Error transferring money: {e}")
@@ -1028,9 +1288,10 @@ __all__ = [
     'log_transaction', 'log_savings_transaction', 'get_user_transactions',
     'create_user_card', 'get_user_cards', 'get_user_card_by_id', 'get_total_balance', 
     'update_card_balance', 'delete_user_card', 'update_user_card', 'transfer_money_between_cards',
-    'safe_color_conversion',
+    'safe_color_conversion', 'mask_card_number',
     'create_envelope', 'get_user_envelopes', 'add_to_envelope', 'get_envelope_transactions', 'get_envelope_stats',
-    'update_envelope',  # ДОДАНО ЦЕ
+    'update_envelope',
+    'create_user', 'get_user_by_email', 'verify_user_credentials', 'verify_card_integrity',
     # Analytics functions
     'get_analytics_data', 'get_category_breakdown', 'get_top_categories', 
     'get_cards_analytics', 'get_budget_progress', 'get_insights_and_forecasts', 'get_monthly_comparison'

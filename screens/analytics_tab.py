@@ -64,6 +64,112 @@ def get_unique_color(envelope_count):
     """Отримати унікальний колір для конверту"""
     return ENVELOPE_COLORS[envelope_count % len(ENVELOPE_COLORS)]
 
+# Білі модальні вікна (аналогічно SavingsTab)
+class WhitePopup(Popup):
+    """Базовий клас білого попапу з темним текстом"""
+    
+    def __init__(self, **kwargs):
+        # Видаляємо всі параметри фону, щоб уникнути конфліктів
+        kwargs.pop('background', '')
+        kwargs.pop('background_color', None)
+        kwargs.pop('background_normal', None)
+        kwargs.pop('background_down', None)
+        
+        super().__init__(**kwargs)
+        
+        # Робимо фон повністю прозорим
+        self.background = ''
+        self.background_color = [1, 1, 1, 0]
+        self.separator_height = 0
+        self.auto_dismiss = False
+        
+        # Створюємо білий фон через canvas
+        with self.canvas.before:
+            Color(*WHITE)
+            self.bg_rect = Rectangle(pos=self.pos, size=self.size)
+            
+            # Додаємо темну рамку
+            Color(*DARK_GRAY)
+            self.border_line = Line(
+                rectangle=(self.x, self.y, self.width, self.height),
+                width=1.2
+            )
+        
+        # Прив'язуємо оновлення позиції та розміру
+        self.bind(pos=self._update_graphics, size=self._update_graphics)
+    
+    def _update_graphics(self, *args):
+        """Оновлюємо графічні елементи при зміні позиції чи розміру"""
+        self.bg_rect.pos = self.pos
+        self.bg_rect.size = self.size
+        self.border_line.rectangle = (self.x, self.y, self.width, self.height)
+
+
+class WhiteButton(Button):
+    """Стилізована кнопка для білих попапів"""
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.background_normal = ''
+        self.background_down = ''
+        self.background_color = PRIMARY_BLUE
+        self.color = WHITE
+        self.font_size = dp(16)
+        self.size_hint_y = None
+        self.height = dp(45)
+        self.bold = True
+        
+        # Додаємо фон через canvas
+        with self.canvas.before:
+            Color(*self.background_color)
+            self.rect = Rectangle(pos=self.pos, size=self.size)
+        
+        self.bind(pos=self._update_rect, size=self._update_rect)
+        self.bind(background_color=self._update_color)
+    
+    def _update_rect(self, *args):
+        self.rect.pos = self.pos
+        self.rect.size = self.size
+    
+    def _update_color(self, instance, value):
+        self.canvas.before.clear()
+        with self.canvas.before:
+            Color(*value)
+            self.rect = Rectangle(pos=self.pos, size=self.size)
+
+
+class WhiteTextInput(TextInput):
+    """Стилізоване текстове поле для білих попапів"""
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.multiline = False
+        self.padding = [dp(15), dp(12)]
+        self.background_normal = ''
+        self.background_active = ''
+        self.background_color = WHITE
+        self.foreground_color = DARK_TEXT
+        self.font_size = dp(16)
+        self.size_hint_y = None
+        self.height = dp(48)
+        self.cursor_color = PRIMARY_BLUE
+        self.hint_text_color = LIGHT_GRAY
+        self.write_tab = False
+        
+        # Додаємо рамку
+        with self.canvas.after:
+            Color(*DARK_GRAY)
+            self.border_line = Line(
+                rectangle=(self.x, self.y, self.width, self.height),
+                width=1
+            )
+        
+        self.bind(pos=self._update_border, size=self._update_border)
+    
+    def _update_border(self, *args):
+        self.border_line.rectangle = (self.x, self.y, self.width, self.height)
+
+
 class CompactEnvelopeCard(BoxLayout):
     """Компактна картка конверту з покращеним дизайном"""
     def __init__(self, envelope_data, on_manage_callback=None, **kwargs):
@@ -220,6 +326,7 @@ class CompactEnvelopeCard(BoxLayout):
         if self.on_manage_callback:
             self.on_manage_callback(self.envelope_data, 'edit')
 
+
 class StatCard(BoxLayout):
     """Картка статистики з покращеним дизайном"""
     def __init__(self, title, value, subtitle="", color=PRIMARY_BLUE, **kwargs):
@@ -282,6 +389,7 @@ class StatCard(BoxLayout):
         """Оновити графіку при зміні розміру"""
         self.bg_rect.pos = self.pos
         self.bg_rect.size = self.size
+
 
 class SimplePieChartWidget(Widget):
     """Інтерактивна кругова діаграма з легендами при наведенні/дотику."""
@@ -555,6 +663,7 @@ class SimplePieChartWidget(Widget):
             valign='middle'
         )
         self.add_widget(no_data_label)
+
 
 class AnalyticsTab(Screen):
     """Вкладка аналітики з покращеним UI"""
@@ -859,8 +968,15 @@ class AnalyticsTab(Screen):
             self.show_edit_envelope_modal(envelope_data)
     
     def show_edit_envelope_modal(self, envelope_data):
-        """Показати модальне вікно редагування конверту з можливістю видалення"""
-        content = BoxLayout(orientation='vertical', spacing=dp(12), padding=dp(15))
+        """Показати модальне вікно редагування конверту з можливістю видалення (білий дизайн)"""
+        content = BoxLayout(orientation='vertical', spacing=dp(15), padding=dp(25))
+        
+        # Додаємо білий фон для контенту
+        with content.canvas.before:
+            Color(*WHITE)
+            self.content_rect = Rectangle(pos=content.pos, size=content.size)
+        
+        content.bind(pos=self._update_content_rect, size=self._update_content_rect)
         
         title = Label(
             text=f"Редагування: {envelope_data['name']}",
@@ -873,23 +989,36 @@ class AnalyticsTab(Screen):
         content.add_widget(title)
         
         # Назва конверту
-        name_input = TextInput(
+        name_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(45))
+        name_layout.add_widget(Label(
+            text='Назва:', 
+            size_hint_x=0.3, 
+            color=DARK_TEXT,
+            font_size=dp(16)
+        ))
+        name_input = WhiteTextInput(
             text=envelope_data['name'],
-            hint_text="Назва конверту",
-            size_hint_y=None,
-            height=dp(40)
+            size_hint_x=0.7
         )
-        content.add_widget(name_input)
+        name_layout.add_widget(name_input)
+        content.add_widget(name_layout)
         
         # Бюджет
-        budget_input = TextInput(
+        budget_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(45))
+        budget_layout.add_widget(Label(
+            text='Бюджет:', 
+            size_hint_x=0.3, 
+            color=DARK_TEXT,
+            font_size=dp(16)
+        ))
+        budget_input = WhiteTextInput(
             text=str(envelope_data['budget_limit']) if envelope_data['budget_limit'] > 0 else "",
-            hint_text="Бюджет (не обов'язково)",
+            hint_text="Не обов'язково",
             input_filter='float',
-            size_hint_y=None,
-            height=dp(40)
+            size_hint_x=0.7
         )
-        content.add_widget(budget_input)
+        budget_layout.add_widget(budget_input)
+        content.add_widget(budget_layout)
         
         error_label = Label(
             text="",
@@ -900,24 +1029,27 @@ class AnalyticsTab(Screen):
         content.add_widget(error_label)
         
         # Кнопки
-        buttons_layout = BoxLayout(size_hint_y=None, height=dp(40), spacing=dp(8))
-        
-        delete_btn = Button(
-            text="Видалити",
-            background_color=ERROR_RED,
-            color=WHITE
+        buttons_layout = BoxLayout(
+            orientation='horizontal', 
+            spacing=dp(10), 
+            size_hint_y=None, 
+            height=dp(50)
         )
         
-        cancel_btn = Button(
+        delete_btn = WhiteButton(
+            text="Видалити",
+            background_color=ERROR_RED
+        )
+        
+        cancel_btn = WhiteButton(
             text="Скасувати",
             background_color=LIGHT_GRAY,
             color=DARK_TEXT
         )
         
-        save_btn = Button(
+        save_btn = WhiteButton(
             text="Зберегти",
-            background_color=SUCCESS_GREEN,
-            color=WHITE
+            background_color=SUCCESS_GREEN
         )
         
         def save_changes(instance):
@@ -951,22 +1083,37 @@ class AnalyticsTab(Screen):
         
         def delete_envelope(instance):
             """Видалити конверт"""
-            confirm_popup = Popup(
-                title='Підтвердження видалення',
-                content=BoxLayout(orientation='vertical', spacing=dp(12), padding=dp(15)),
-                size_hint=(0.7, 0.3)
-            )
+            confirm_content = BoxLayout(orientation='vertical', spacing=dp(15), padding=dp(25))
             
-            confirm_content = confirm_popup.content
+            with confirm_content.canvas.before:
+                Color(*WHITE)
+                self.confirm_rect = Rectangle(pos=confirm_content.pos, size=confirm_content.size)
+            
+            confirm_content.bind(pos=self._update_confirm_rect, size=self._update_confirm_rect)
+            
             confirm_content.add_widget(Label(
                 text=f"Ви впевнені, що хочете видалити\nконверт '{envelope_data['name']}'?",
-                halign='center'
+                halign='center',
+                color=DARK_TEXT,
+                font_size=dp(16)
             ))
             
-            confirm_buttons = BoxLayout(size_hint_y=None, height=dp(40), spacing=dp(8))
+            confirm_buttons = BoxLayout(
+                orientation='horizontal', 
+                spacing=dp(10), 
+                size_hint_y=None, 
+                height=dp(50)
+            )
             
-            no_btn = Button(text='Ні', background_color=LIGHT_GRAY)
-            yes_btn = Button(text='Так', background_color=ERROR_RED, color=WHITE)
+            no_btn = WhiteButton(
+                text='Ні', 
+                background_color=LIGHT_GRAY,
+                color=DARK_TEXT
+            )
+            yes_btn = WhiteButton(
+                text='Так', 
+                background_color=ERROR_RED
+            )
             
             def confirm_delete(instance):
                 try:
@@ -983,12 +1130,18 @@ class AnalyticsTab(Screen):
                     print(f"Помилка видалення конверту: {e}")
                     error_label.text = "Помилка при видаленні конверту"
             
-            no_btn.bind(on_press=confirm_popup.dismiss)
+            no_btn.bind(on_press=lambda x: confirm_popup.dismiss())
             yes_btn.bind(on_press=confirm_delete)
             
             confirm_buttons.add_widget(no_btn)
             confirm_buttons.add_widget(yes_btn)
             confirm_content.add_widget(confirm_buttons)
+            
+            confirm_popup = WhitePopup(
+                title='Підтвердження видалення',
+                content=confirm_content,
+                size_hint=(0.7, 0.3)
+            )
             confirm_popup.open()
         
         delete_btn.bind(on_press=delete_envelope)
@@ -1000,12 +1153,22 @@ class AnalyticsTab(Screen):
         buttons_layout.add_widget(save_btn)
         content.add_widget(buttons_layout)
         
-        popup = Popup(
+        popup = WhitePopup(
             title='Редагування конверту',
             content=content,
             size_hint=(0.85, 0.5)
         )
         popup.open()
+    
+    def _update_content_rect(self, instance, value):
+        """Оновлюємо фон контенту"""
+        self.content_rect.pos = instance.pos
+        self.content_rect.size = instance.size
+    
+    def _update_confirm_rect(self, instance, value):
+        """Оновлюємо фон підтвердження"""
+        self.confirm_rect.pos = instance.pos
+        self.confirm_rect.size = instance.size
     
     def create_envelope(self):
         """Створити новий конверт з унікальним кольором"""
@@ -1050,8 +1213,15 @@ class AnalyticsTab(Screen):
             self.ids.analytics_message.color = ERROR_RED
     
     def show_add_money_modal(self, envelope_data):
-        """Показати модальне вікно поповнення конверту"""
-        content = BoxLayout(orientation='vertical', spacing=dp(12), padding=dp(15))
+        """Показати модальне вікно поповнення конверту (білий дизайн)"""
+        content = BoxLayout(orientation='vertical', spacing=dp(15), padding=dp(25))
+        
+        # Додаємо білий фон для контенту
+        with content.canvas.before:
+            Color(*WHITE)
+            self.content_rect = Rectangle(pos=content.pos, size=content.size)
+        
+        content.bind(pos=self._update_content_rect, size=self._update_content_rect)
         
         title = Label(
             text=f"Поповнення: {envelope_data['name']}",
@@ -1064,33 +1234,54 @@ class AnalyticsTab(Screen):
         content.add_widget(title)
         
         # Вибір картки
-        card_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(40))
-        card_layout.add_widget(Label(text="З картки:", size_hint_x=0.4, color=DARK_TEXT))
+        card_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(45))
+        card_layout.add_widget(Label(
+            text="З картки:", 
+            size_hint_x=0.4, 
+            color=DARK_TEXT,
+            font_size=dp(16)
+        ))
         
         card_spinner = Spinner(
             text=self.user_cards[0]['name'] if self.user_cards else "Немає карток",
             values=[card['name'] for card in self.user_cards],
-            size_hint_x=0.6
+            size_hint_x=0.6,
+            background_color=WHITE,
+            color=DARK_TEXT
         )
         card_layout.add_widget(card_spinner)
         content.add_widget(card_layout)
         
         # Сума поповнення
-        amount_input = TextInput(
+        amount_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(45))
+        amount_layout.add_widget(Label(
+            text="Сума:", 
+            size_hint_x=0.4, 
+            color=DARK_TEXT,
+            font_size=dp(16)
+        ))
+        amount_input = WhiteTextInput(
             hint_text="Сума поповнення",
             input_filter='float',
-            size_hint_y=None,
-            height=dp(40)
+            size_hint_x=0.6
         )
-        content.add_widget(amount_input)
+        amount_layout.add_widget(amount_input)
+        content.add_widget(amount_layout)
         
         # Опис
-        desc_input = TextInput(
-            hint_text="Опис (не обов'язково)",
-            size_hint_y=None,
-            height=dp(40)
+        desc_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(45))
+        desc_layout.add_widget(Label(
+            text="Опис:", 
+            size_hint_x=0.4, 
+            color=DARK_TEXT,
+            font_size=dp(16)
+        ))
+        desc_input = WhiteTextInput(
+            hint_text="Не обов'язково",
+            size_hint_x=0.6
         )
-        content.add_widget(desc_input)
+        desc_layout.add_widget(desc_input)
+        content.add_widget(desc_layout)
         
         error_label = Label(
             text="",
@@ -1100,18 +1291,22 @@ class AnalyticsTab(Screen):
         )
         content.add_widget(error_label)
         
-        buttons_layout = BoxLayout(size_hint_y=None, height=dp(40), spacing=dp(8))
+        buttons_layout = BoxLayout(
+            orientation='horizontal', 
+            spacing=dp(10), 
+            size_hint_y=None, 
+            height=dp(50)
+        )
         
-        cancel_btn = Button(
+        cancel_btn = WhiteButton(
             text="Скасувати",
             background_color=LIGHT_GRAY,
             color=DARK_TEXT
         )
         
-        add_btn = Button(
+        add_btn = WhiteButton(
             text="Поповнити",
-            background_color=SUCCESS_GREEN,
-            color=WHITE
+            background_color=SUCCESS_GREEN
         )
         
         def add_money(instance):
@@ -1163,7 +1358,7 @@ class AnalyticsTab(Screen):
         buttons_layout.add_widget(add_btn)
         content.add_widget(buttons_layout)
         
-        popup = Popup(
+        popup = WhitePopup(
             title='Поповнення конверту',
             content=content,
             size_hint=(0.85, 0.5)
@@ -1192,8 +1387,15 @@ class AnalyticsTab(Screen):
             return False
     
     def show_success_message(self, message):
-        """Показати повідомлення про успіх"""
-        content = BoxLayout(orientation='vertical', spacing=dp(15), padding=dp(20))
+        """Показати повідомлення про успіх (білий дизайн)"""
+        content = BoxLayout(orientation='vertical', spacing=dp(15), padding=dp(25))
+        
+        # Додаємо білий фон для контенту
+        with content.canvas.before:
+            Color(*WHITE)
+            self.content_rect = Rectangle(pos=content.pos, size=content.size)
+        
+        content.bind(pos=self._update_content_rect, size=self._update_content_rect)
         
         content.add_widget(Label(
             text=message, 
@@ -1201,17 +1403,14 @@ class AnalyticsTab(Screen):
             font_size=dp(16)
         ))
         
-        ok_btn = Button(
+        ok_btn = WhiteButton(
             text='OK',
-            size_hint_y=None,
-            height=dp(40),
-            background_color=PRIMARY_BLUE,
-            color=WHITE
+            background_color=PRIMARY_BLUE
         )
         ok_btn.bind(on_press=lambda x: popup.dismiss())
         content.add_widget(ok_btn)
         
-        popup = Popup(
+        popup = WhitePopup(
             title='Успіх',
             content=content,
             size_hint=(0.6, 0.3)
