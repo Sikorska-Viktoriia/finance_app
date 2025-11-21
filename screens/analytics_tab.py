@@ -33,11 +33,36 @@ LIGHT_BLUE = (0.92, 0.98, 1.0, 1)
 ERROR_RED = (0.9, 0.2, 0.2, 1)
 SUCCESS_GREEN = (0.2, 0.8, 0.3, 1)
 WARNING_ORANGE = (1, 0.6, 0.2, 1)
+SAVINGS_PINK = (0.95, 0.4, 0.6, 1)  # Рожевий для заощаджень
 WHITE = (1, 1, 1, 1)
 DARK_TEXT = (0.1, 0.1, 0.1, 1)
 LIGHT_GRAY = (0.9, 0.9, 0.9, 1)
 MEDIUM_GRAY = (0.7, 0.7, 0.7, 1)
 DARK_GRAY = (0.4, 0.4, 0.4, 1)
+
+# Палітра унікальних кольорів для конвертів
+ENVELOPE_COLORS = [
+    [0.95, 0.3, 0.5, 1],    # Яскраво рожевий
+    [0.2, 0.7, 0.9, 1],     # Блакитний
+    [0.2, 0.8, 0.3, 1],     # Зелений
+    [1.0, 0.6, 0.2, 1],     # Помаранчевий
+    [0.6, 0.2, 0.8, 1],     # Фіолетовий
+    [0.2, 0.8, 0.8, 1],     # Бірюзовий
+    [0.9, 0.2, 0.2, 1],     # Червоний
+    [0.4, 0.2, 0.9, 1],     # Синій
+    [1.0, 0.8, 0.2, 1],     # Жовтий
+    [0.8, 0.4, 0.9, 1],     # Лавандовий
+    [0.3, 0.8, 0.6, 1],     # М'ятний
+    [0.9, 0.5, 0.7, 1],     # Світло рожевий
+    [0.5, 0.5, 0.9, 1],     # Синьо-фіолетовий
+    [0.9, 0.7, 0.3, 1],     # Золотистий
+    [0.7, 0.9, 0.4, 1],     # Салатовий
+    [0.8, 0.6, 0.9, 1],     # Світло фіолетовий
+]
+
+def get_unique_color(envelope_count):
+    """Отримати унікальний колір для конверту"""
+    return ENVELOPE_COLORS[envelope_count % len(ENVELOPE_COLORS)]
 
 class CompactEnvelopeCard(BoxLayout):
     """Компактна картка конверту з покращеним дизайном"""
@@ -259,12 +284,19 @@ class StatCard(BoxLayout):
         self.bg_rect.size = self.size
 
 class SimplePieChartWidget(Widget):
-    """Кругова діаграма з заповненими секторами та інтелектуальними легендами"""
+    """Інтерактивна кругова діаграма з легендами при наведенні/дотику."""
     def __init__(self, data=None, **kwargs):
         super().__init__(**kwargs)
         self.data = data or []
         self.size_hint = (1, None)
         self.height = dp(300)
+        
+        self.hovered_sector = None
+        self.current_legend = None
+        self.sectors = []
+        self.center_x = 0
+        self.center_y = 0
+        self.radius = 0
         
         self.bind(pos=self.update_chart, size=self.update_chart)
     
@@ -288,200 +320,218 @@ class SimplePieChartWidget(Widget):
             self.show_no_data()
             return
         
-        center_x = self.width / 2
-        center_y = self.height / 2
-        radius = min(self.width, self.height) * 0.35
+        self.center_x = self.width / 2
+        self.center_y = self.height / 2
+        self.radius = min(self.width, self.height) * 0.35
         
-        start_angle = 90  # Починаємо з 12-ї години (90 градусів)
+        # В Kivy: angle_start=0 = 3 година, збільшення = проти годинникової стрілки
+        start_angle = 0
+        self.sectors = []
         
         # Обходимо і малюємо сектори
         for i, item in enumerate(self.data):
             percentage = item['amount'] / total
             angle = percentage * 360
             
-            # Kivy Ellipse малює проти годинникової стрілки,
-            # тому кінцевий кут має бути меншим за початковий
-            end_angle = start_angle - angle
+            end_angle = start_angle + angle
             
-            # Малюємо заповнений сектор
-            self.draw_filled_sector(center_x, center_y, radius, end_angle, start_angle, item['color'])
+            self.draw_filled_sector(self.center_x, self.center_y, self.radius, start_angle, end_angle, item['color'])
             
-            # Новий початковий кут для наступного сектора
+            # Зберігаємо дані сектора
+            self.sectors.append({
+                'item': item,
+                'percentage': percentage,
+                'start_angle': start_angle,
+                'end_angle': end_angle,
+                'color': item['color']
+            })
+            
             start_angle = end_angle
         
-        # Потім додаємо легенди з уникненням перетинів
-        # Передаємо обчислені дані для легенд
-        self.draw_smart_legends(center_x, center_y, radius, total)
+        self.add_hint()
 
     def draw_filled_sector(self, cx, cy, radius, start_angle, end_angle, color):
-        """Малює заповнений сектор кругової діаграми, використовуючи Ellipse."""
+        """Малює заповнений сектор кругової діаграми"""
         with self.canvas:
             Color(*color)
             Ellipse(
                 pos=(cx - radius, cy - radius),
                 size=(radius * 2, radius * 2),
                 angle_start=start_angle,
-                angle_end=end_angle # end_angle < start_angle
+                angle_end=end_angle
             )
 
-    def draw_smart_legends(self, cx, cy, radius, total):
-        """
-        ВИПРАВЛЕНО: Обчислення середнього кута для легенд,
-        що відповідає обходу проти годинникової стрілки.
-        """
-        legend_positions = []
-        
-        # Починаємо з тієї ж точки, що і для малювання секторів
-        current_angle = 90
-        
-        for i, item in enumerate(self.data):
-            percentage = item['amount'] / total
-            angle = percentage * 360
-            
-            # Пропускаємо дуже малі сектори (< 1 градус)
-            if angle < 1:
-                current_angle -= angle
-                continue
-                
-            # mid_angle тепер знаходиться між поточним current_angle
-            # та кутом, який буде current_angle - angle (кінцевий кут сектора)
-            
-            # ВИПРАВЛЕННЯ: Середній кут = Поточний_кут - Половина_ширини_сектора
-            mid_angle = current_angle - angle / 2
-            
-            # Визначаємо оптимальну позицію для легенди
-            text_pos, line_points = self.find_best_legend_position(
-                cx, cy, radius, mid_angle, legend_positions, item
-            )
-            
-            if text_pos:
-                # ... (Малювання лінії та тексту залишається без змін) ...
-                with self.canvas:
-                    Color(*item['color'])
-                    Line(points=line_points, width=dp(1.2))
-                
-                self.add_legend_text(text_pos, item, percentage)
-                legend_positions.append(text_pos)
-            
-            # Переходимо до наступного сектора
-            current_angle -= angle
+    def on_touch_move(self, touch):
+        """Обробка руху курсора/дотику для відображення легенди"""
+        return self.handle_touch(touch)
 
-    def draw_smart_legends(self, cx, cy, radius, total):
-        """Малює інтелектуальні легенди з уникненням перетинів"""
-        legend_positions = []  # Для відстеження позицій легенд
-        
-        start_angle = 90
-        
-        for i, item in enumerate(self.data):
-            percentage = item['amount'] / total
-            angle = percentage * 360
-            
-            # Пропускаємо дуже малі сектори (< 1 градус)
-            if angle < 1:
-                start_angle -= angle
-                continue
-                
-            # Кут середини сектору
-            mid_angle = start_angle - angle / 2
-            
-            # Визначаємо оптимальну позицію для легенди
-            text_pos, line_points = self.find_best_legend_position(
-                cx, cy, radius, mid_angle, legend_positions, item
-            )
-            
-            if text_pos:
-                # Малюємо лінію
-                with self.canvas:
-                    Color(*item['color'])
-                    Line(points=line_points, width=dp(1.2))
-                
-                # Додаємо текст
-                self.add_legend_text(text_pos, item, percentage)
-                legend_positions.append(text_pos)
-            
-            start_angle -= angle # Переходимо до наступного сектора
+    def on_touch_down(self, touch):
+        """Обробка натискання для відображення легенди"""
+        return self.handle_touch(touch)
 
-    def find_best_legend_position(self, cx, cy, radius, angle, existing_positions, item):
+    def handle_touch(self, touch):
+        """Обробка дотику"""
+        if not self.collide_point(*touch.pos):
+            self.hide_legend()
+            self.hovered_sector = None
+            return False
+        
+        sector = self.get_sector_at_pos(touch.x, touch.y)
+        
+        if sector != self.hovered_sector:
+            self.hovered_sector = sector
+            if sector:
+                self.show_legend(sector, touch.x, touch.y)
+            else:
+                self.hide_legend()
+        
+        return True
+
+    def get_sector_at_pos(self, x, y):
         """
-        ВИПРАВЛЕННЯ 3: Знаходить найкращу позицію для легенди з контрольованою довжиною.
+        ВИПРАВЛЕНА ЛОГІКА: Правильне визначення сектора з урахуванням системи Kivy
         """
-        angle_rad = math.radians(angle)
+        dx = x - self.center_x
+        dy = y - self.center_y
+        distance = math.sqrt(dx*dx + dy*dy)
         
-        # ЗМЕНШЕНО: Використовуємо менші множники для коротших ліній
-        distances = [1.1, 1.25, 1.4, 1.55] 
-        max_text_radius = radius * 1.6 # Обмежуємо максимальну довжину
+        if distance > self.radius or distance == 0:
+            return None
         
-        for distance_multiplier in distances:
-            text_radius = radius * distance_multiplier
-            
-            # Обмежуємо радіус, щоб лінії не виходили занадто далеко
-            text_radius = min(text_radius, max_text_radius)
-            
-            text_x = cx + text_radius * math.cos(angle_rad)
-            text_y = cy + text_radius * math.sin(angle_rad)
-            
-            # Перевіряємо, чи не перетинається з існуючими легендами
-            if not self.check_collision((text_x, text_y), existing_positions, dp(45)):
-                # Точки для лінії: Edge -> Mid Point -> Text Position
-                edge_x = cx + radius * math.cos(angle_rad)
-                edge_y = cy + radius * math.sin(angle_rad)
-                
-                # Проміжна точка для згладжування лінії (виносимо трохи за радіус)
-                mid_radius = radius * 1.05
-                mid_x = cx + mid_radius * math.cos(angle_rad)
-                mid_y = cy + mid_radius * math.sin(angle_rad)
-                
-                line_points = [edge_x, edge_y, mid_x, mid_y, text_x, text_y]
-                return (text_x, text_y), line_points
+        # Обчислюємо кут у радіанах
+        angle_rad = math.atan2(dy, dx)
         
-        return None, None
+        # Конвертуємо в систему Kivy:
+        # - 0° = праворуч (3 година)
+        # - Збільшення проти годинникової стрілки
+        # - angle_rad: 0 = праворуч, π/2 = вгору, π = ліворуч, -π/2 = вниз
+        angle_deg = math.degrees(angle_rad)
+        
+        # Конвертуємо в систему Kivy (0° = праворуч, збільшення проти годинникової)
+        angle_kivy = (90 - angle_deg) % 360
+        if angle_kivy < 0:
+            angle_kivy += 360
+        
+        # print(f"Курсор: ({x:.1f}, {y:.1f}), Кут Kivy: {angle_kivy:.1f}°")
+        
+        # Шукаємо сектор, що містить цей кут
+        for i, sector in enumerate(self.sectors):
+            start = sector['start_angle']
+            end = sector['end_angle']
+            
+            # print(f"Сектор {i}: {sector['item']['name']}, Кут: {start:.1f}° - {end:.1f}°")
+            
+            # Для нормальних секторів (start < end)
+            if start <= end:
+                if start <= angle_kivy <= end:
+                    # print(f"✓ Знайдено сектор: {sector['item']['name']}")
+                    return sector
+            else:
+                # Для секторів, що переходять через 360°
+                if angle_kivy >= start or angle_kivy <= end:
+                    # print(f"✓ Знайдено сектор (через 360°): {sector['item']['name']}")
+                    return sector
+        
+        # print("✗ Сектор не знайдено")
+        return None
 
-    def check_collision(self, new_pos, existing_positions, min_distance):
-        """Перевіряє колізії з існуючими легендами"""
-        for pos in existing_positions:
-            distance = math.sqrt((new_pos[0] - pos[0])**2 + (new_pos[1] - pos[1])**2)
-            if distance < min_distance:
-                return True
-        return False
-
-    def add_legend_text(self, position, item, percentage):
-        """Додає текст легенди з правильним вирівнюванням"""
-        text_x, text_y = position
+    def show_legend(self, sector, x, y):
+        """Показати легенду для сектора"""
+        self.hide_legend()
         
-        # Визначаємо вирівнювання на основі позиції
-        # Використовуємо self.width / 2 для halign
-        halign = 'left' if text_x >= self.width / 2 else 'right'
-        valign = 'bottom' if text_y > self.height / 2 else 'top'
+        item = sector['item']
+        percentage = sector['percentage']
         
-        # Компактний формат тексту
-        text_content = f"{item['name']}\n({percentage:.1f}%)"
-        if percentage * 100 > 5:  # Для більших секторів показуємо суму
-            text_content = f"{item['name']}\n${item['amount']:.2f}\n({percentage:.1f}%)"
-            text_height = dp(36)
-        else:  # Для малих секторів - компактніше
-            text_height = dp(28)
+        # print(f"=== ПОКАЗУЄМО ЛЕГЕНДУ ДЛЯ: {item['name']} ===")
         
-        text_width = dp(65)
+        # Створюємо контент легенди
+        legend_content = f"{item['name']}\n${item['amount']:.2f}\n({percentage * 100:.1f}%)"
         
-        # Коригуємо позицію для вирівнювання
-        pos_x = text_x if halign == 'left' else text_x - text_width
-        pos_y = text_y if valign == 'bottom' else text_y - text_height
+        # Розміри легенди
+        text_width = dp(120)
+        text_height = dp(65)
         
-        # Перевіряємо, чи текст не виходить за межі віджета
+        # Визначаємо позицію для легенди
+        pos_x = x + dp(15)
+        pos_y = y + dp(15)
+        
+        # Коректуємо позицію, якщо виходить за межі
+        if pos_x + text_width > self.width - dp(5):
+            pos_x = x - text_width - dp(15)
+        if pos_y + text_height > self.height - dp(5):
+            pos_y = y - text_height - dp(15)
+        
         pos_x = max(dp(5), min(pos_x, self.width - text_width - dp(5)))
         pos_y = max(dp(5), min(pos_y, self.height - text_height - dp(5)))
-        
-        text_label = Label(
-            text=text_content,
-            pos=(pos_x, pos_y),
+
+        # Створюємо легенду
+        self.current_legend = BoxLayout(
+            orientation='vertical',
             size=(text_width, text_height),
-            font_size=dp(8),
-            color=DARK_TEXT,
-            halign=halign,
-            valign=valign,
-            text_size=(text_width, None)
+            pos=(pos_x, pos_y),
+            padding=dp(8),
+            spacing=dp(3)
         )
-        self.add_widget(text_label)
+        
+        # Фон легенди
+        with self.current_legend.canvas.before:
+            Color(1, 1, 1, 0.98)
+            RoundedRectangle(
+                pos=self.current_legend.pos,
+                size=self.current_legend.size,
+                radius=[dp(8)]
+            )
+            Color(0.3, 0.3, 0.3, 0.9)
+            Line(
+                rounded_rectangle=(
+                    self.current_legend.x, self.current_legend.y,
+                    self.current_legend.width, self.current_legend.height,
+                    dp(8)
+                ),
+                width=dp(1.5)
+            )
+        
+        # Колірний індикатор
+        color_indicator = Widget(size_hint_y=None, height=dp(4))
+        with color_indicator.canvas:
+            Color(*sector['color'])
+            Rectangle(pos=color_indicator.pos, size=color_indicator.size)
+        
+        # Текст легенди
+        legend_label = Label(
+            text=legend_content,
+            font_size=dp(11),
+            color=DARK_TEXT,
+            halign='center',
+            valign='middle',
+            size_hint_y=1
+        )
+        
+        self.current_legend.add_widget(color_indicator)
+        self.current_legend.add_widget(legend_label)
+        self.add_widget(self.current_legend)
+
+    def hide_legend(self):
+        """Приховати поточну легенду"""
+        if self.current_legend:
+            self.remove_widget(self.current_legend)
+            self.current_legend = None
+
+    def add_hint(self):
+        """Додати підказку про те, як користуватися діаграмою"""
+        if not self.data:
+            return
+            
+        hint_label = Label(
+            text="👆 Наведіть на сектор для деталей",
+            pos=(dp(10), dp(5)),
+            size=(self.width - dp(20), dp(20)),
+            size_hint=(None, None),
+            font_size=dp(10),
+            color=DARK_GRAY,
+            halign='center'
+        )
+        self.add_widget(hint_label)
 
     def show_no_data(self):
         """Показати повідомлення про відсутність даних"""
@@ -578,12 +628,12 @@ class AnalyticsTab(Screen):
             app = self.get_app()
             
             default_envelopes = [
-                {"name": "Їжа", "color": [0.95, 0.3, 0.5, 1]},
-                {"name": "Транспорт", "color": [0.2, 0.7, 0.9, 1]},
-                {"name": "Розваги", "color": [0.2, 0.8, 0.3, 1]},
-                {"name": "Одяг", "color": [1, 0.6, 0.2, 1]},
-                {"name": "Здоров'я", "color": [0.6, 0.2, 0.8, 1]},
-                {"name": "Подарунки", "color": [0.2, 0.8, 0.8, 1]}
+                {"name": "Їжа", "color": ENVELOPE_COLORS[0]},
+                {"name": "Транспорт", "color": ENVELOPE_COLORS[1]},
+                {"name": "Розваги", "color": ENVELOPE_COLORS[2]},
+                {"name": "Одяг", "color": ENVELOPE_COLORS[3]},
+                {"name": "Здоров'я", "color": ENVELOPE_COLORS[4]},
+                {"name": "Подарунки", "color": ENVELOPE_COLORS[5]}
             ]
             
             for envelope in default_envelopes:
@@ -638,7 +688,7 @@ class AnalyticsTab(Screen):
                 self.envelopes_for_chart.append({
                     'name': 'Заощадження',
                     'amount': savings_data['total_savings'],
-                    'color': [0.4, 0.2, 0.9, 1]  # Фіолетовий для заощаджень
+                    'color': SAVINGS_PINK  # Рожевий для заощаджень
                 })
             
         except Exception as e:
@@ -733,7 +783,7 @@ class AnalyticsTab(Screen):
                 'title': 'Заощадження',
                 'value': f"${self.analytics_data.get('total_savings', 0):.0f}",
                 'subtitle': f"{self.analytics_data.get('savings_progress', 0):.0f}% від цілі",
-                'color': [0.4, 0.2, 0.9, 1]
+                'color': SAVINGS_PINK  # Рожевий для заощаджень
             },
             {
                 'title': 'Транзакції',
@@ -763,9 +813,8 @@ class AnalyticsTab(Screen):
         # Основний контейнер для діаграми
         charts_main_layout = BoxLayout(orientation='vertical', spacing=dp(5), size_hint_y=None, height=dp(350))
         
-        if self.envelopes_for_chart:
+        if hasattr(self, 'envelopes_for_chart') and self.envelopes_for_chart:
             # Заголовок діаграми
-            # ВИПРАВЛЕННЯ: Додамо 'Візуалізація' як на зображенні
             vis_label = Label(
                 text="Візуалізація",
                 font_size=dp(18),
@@ -787,7 +836,6 @@ class AnalyticsTab(Screen):
             charts_main_layout.add_widget(title_label)
             
             # Кругова діаграма
-            # ВИПРАВЛЕННЯ: Використовуємо виправлений клас SimplePieChartWidget
             pie_chart = SimplePieChartWidget(self.envelopes_for_chart)
             pie_chart.size_hint_y = 1
             charts_main_layout.add_widget(pie_chart)
@@ -802,8 +850,6 @@ class AnalyticsTab(Screen):
             charts_main_layout.add_widget(no_data_label)
         
         container.add_widget(charts_main_layout)
-    
-
 
     def on_envelope_action(self, envelope_data, action):
         """Обробка дій з конвертом"""
@@ -813,7 +859,7 @@ class AnalyticsTab(Screen):
             self.show_edit_envelope_modal(envelope_data)
     
     def show_edit_envelope_modal(self, envelope_data):
-        """Показати модальне вікно редагування конверту"""
+        """Показати модальне вікно редагування конверту з можливістю видалення"""
         content = BoxLayout(orientation='vertical', spacing=dp(12), padding=dp(15))
         
         title = Label(
@@ -853,7 +899,14 @@ class AnalyticsTab(Screen):
         )
         content.add_widget(error_label)
         
+        # Кнопки
         buttons_layout = BoxLayout(size_hint_y=None, height=dp(40), spacing=dp(8))
+        
+        delete_btn = Button(
+            text="Видалити",
+            background_color=ERROR_RED,
+            color=WHITE
+        )
         
         cancel_btn = Button(
             text="Скасувати",
@@ -896,9 +949,53 @@ class AnalyticsTab(Screen):
             except ValueError:
                 error_label.text = "Введіть коректну суму бюджету"
         
+        def delete_envelope(instance):
+            """Видалити конверт"""
+            confirm_popup = Popup(
+                title='Підтвердження видалення',
+                content=BoxLayout(orientation='vertical', spacing=dp(12), padding=dp(15)),
+                size_hint=(0.7, 0.3)
+            )
+            
+            confirm_content = confirm_popup.content
+            confirm_content.add_widget(Label(
+                text=f"Ви впевнені, що хочете видалити\nконверт '{envelope_data['name']}'?",
+                halign='center'
+            ))
+            
+            confirm_buttons = BoxLayout(size_hint_y=None, height=dp(40), spacing=dp(8))
+            
+            no_btn = Button(text='Ні', background_color=LIGHT_GRAY)
+            yes_btn = Button(text='Так', background_color=ERROR_RED, color=WHITE)
+            
+            def confirm_delete(instance):
+                try:
+                    # Видаляємо конверт з бази даних
+                    cursor.execute("DELETE FROM envelopes WHERE id=?", (envelope_data['id'],))
+                    cursor.execute("DELETE FROM envelope_transactions WHERE envelope_id=?", (envelope_data['id'],))
+                    conn.commit()
+                    
+                    confirm_popup.dismiss()
+                    popup.dismiss()
+                    self.load_data()
+                    self.show_success_message(f"Конверт '{envelope_data['name']}' успішно видалено!")
+                except Exception as e:
+                    print(f"Помилка видалення конверту: {e}")
+                    error_label.text = "Помилка при видаленні конверту"
+            
+            no_btn.bind(on_press=confirm_popup.dismiss)
+            yes_btn.bind(on_press=confirm_delete)
+            
+            confirm_buttons.add_widget(no_btn)
+            confirm_buttons.add_widget(yes_btn)
+            confirm_content.add_widget(confirm_buttons)
+            confirm_popup.open()
+        
+        delete_btn.bind(on_press=delete_envelope)
         cancel_btn.bind(on_press=lambda x: popup.dismiss())
         save_btn.bind(on_press=save_changes)
         
+        buttons_layout.add_widget(delete_btn)
         buttons_layout.add_widget(cancel_btn)
         buttons_layout.add_widget(save_btn)
         content.add_widget(buttons_layout)
@@ -911,7 +1008,7 @@ class AnalyticsTab(Screen):
         popup.open()
     
     def create_envelope(self):
-        """Створити новий конверт"""
+        """Створити новий конверт з унікальним кольором"""
         try:
             name_input = self.ids.envelope_name_input
             budget_input = self.ids.envelope_budget_input
@@ -927,29 +1024,8 @@ class AnalyticsTab(Screen):
             
             budget = float(budget_text) if budget_text else 0.0
             
-            # Палітра кольорів
-            color_palette = [
-                [0.95, 0.3, 0.5, 1],
-                [0.2, 0.7, 0.9, 1],
-                [0.2, 0.8, 0.3, 1],
-                [1, 0.6, 0.2, 1],
-                [0.6, 0.2, 0.8, 1],
-                [0.2, 0.8, 0.8, 1],
-                [0.9, 0.2, 0.2, 1],
-                [0.4, 0.2, 0.9, 1]
-            ]
-            
-            # Вибираємо колір
-            color_map = {
-                'їжа': color_palette[0],
-                'транспорт': color_palette[1],
-                'розваги': color_palette[2],
-                'одяг': color_palette[3],
-                'здоровья': color_palette[4],
-                'подарунки': color_palette[5]
-            }
-            
-            color = color_map.get(name.lower(), color_palette[len(self.envelopes_data) % len(color_palette)])
+            # Отримуємо унікальний колір для нового конверту
+            color = get_unique_color(len(self.envelopes_data))
             
             app = self.get_app()
             envelope_id = create_envelope(cursor, conn, app.current_user_id, name, color, budget)
