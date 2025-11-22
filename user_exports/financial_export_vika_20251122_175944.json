@@ -1,0 +1,211 @@
+{
+  "export_info": {
+    "export_date": "2025-11-22 17:59:44",
+    "user_id": 2,
+    "username": "vika"
+  },
+  "profile": {
+    "username": "vika",
+    "email": "vika@gmail.com",
+    "registration_date": "2025-11-22 14:54:51",
+    "profile_photo": "profile_photos/profile_2_20251122_175848.jpg"
+  },
+  "financial_data": {
+    "cards": [
+      {
+        "id": 8,
+        "name": "основна картка",
+        "number": "gAAAAABpIc8zoHy0rX2pOkrp2PWageOSaE3Kk0kBM4Oidj3qWOEkaEsFd5119D7JMl267dNZKM2r85D-2hgw5s8zUE1-g7xe5-lTLdbOVhabLE0OwSJpvYk=",
+        "bank": "ПриватБанк",
+        "balance": 500.0,
+        "color": [
+          0.6,
+          0.1,
+          0.1,
+          1
+        ]
+      },
+      {
+        "id": 9,
+        "name": "wertyui",
+        "number": "gAAAAABpIdKCiijz5IHvL5g4uiuPegV9JaxPD3LDnvPpjNksrGr98pJNsVbuv2Yxw_jynsE5pCowqnIrfdj5Kf2Wv5jRheL0rT6w2b14sv02wYfbfWS4bms=",
+        "bank": "Ощадбанк",
+        "balance": 0.0,
+        "color": [
+          0.0,
+          0.4,
+          0.1,
+          1
+        ]
+      }
+    ],
+    "transactions": [
+      {
+        "type": "envelope_deposit",
+        "amount": 400.0,
+        "description": " (Розваги)",
+        "date": "2025-11-22 15:24:07",
+        "card_name": "основна картка"
+      },
+      {
+        "type": "envelope_deposit",
+        "amount": 10.0,
+        "description": " (Транспорт)",
+        "date": "2025-11-22 15:24:01",
+        "card_name": "основна картка"
+      },
+      {
+        "type": "envelope_deposit",
+        "amount": 100.0,
+        "description": " (Їжа)",
+        "date": "2025-11-22 15:23:56",
+        "card_name": "основна картка"
+      },
+      {
+        "type": "deposit",
+        "amount": 10.0,
+        "description": "Поповнення картки основна картка",
+        "date": "2025-11-22 15:10:19",
+        "card_name": "основна картка"
+      },
+      {
+        "type": "deposit",
+        "amount": 1000.0,
+        "description": "Поповнення картки основна картка",
+        "date": "2025-11-22 14:57:03",
+        "card_name": "основна картка"
+      },
+      {
+        "type": "initial",
+        "amount": 0.0,
+        "description": "Створено обліковий запис",
+        "date": "2025-11-22 14:54:51",
+        "card_name": null
+      }
+    ],
+    "envelopes": [
+      {
+        "id": 8,
+        "name": "Їжа",
+        "color": [
+          0.95,
+          0.3,
+          0.5,
+          1
+        ],
+        "budget_limit": 0.0,
+        "current_amount": 100.0,
+        "usage_percentage": 0
+      },
+      {
+        "id": 9,
+        "name": "Транспорт",
+        "color": [
+          0.2,
+          0.7,
+          0.9,
+          1
+        ],
+        "budget_limit": 0.0,
+        "current_amount": 10.0,
+        "usage_percentage": 0
+      },
+      {
+        "id": 10,
+        "name": "Розваги",
+        "color": [
+          0.2,
+          0.8,
+          0.3,
+          1
+        ],
+        "budget_limit": 0.0,
+        "current_amount": 400.0,
+        "usage_percentage": 0
+      },
+      {
+        "id": 11,
+        "name": "Одяг",
+        "color": [
+          1.0,
+          0.6,
+          0.2,
+          1
+        ],
+        "budget_limit": 0.0,
+        "current_amount": 0.0,
+        "usage_percentage": 0
+      },
+      {
+        "id": 12,
+        "name": "Здоров'я",
+        "color": [
+          0.6,
+          0.2,
+          0.8,
+          1
+        ],
+        "budget_limit": 0.0,
+        "current_amount": 0.0,
+        "usage_percentage": 0
+      },
+      {
+        "id": 13,
+        "name": "Подарунки",
+        "color": [
+          0.2,
+          0.8,
+          0.8,
+          1
+        ],
+        "budget_limit": 0.0,
+        "current_amount": 0.0,
+        "usage_percentage": 0
+      }
+    ],
+    "savings_plans": []
+  },
+  "settings": {
+    "theme": "dark",
+    "language": "english",
+    "notifications_enabled": true,
+    "biometric_auth": false
+  },
+  "levels": {
+    "level": 1,
+    "experience": 1,
+    "achievements": [],
+    "next_level_xp": 100,
+    "progress_percentage": 1.0
+  },
+  "sessions": [
+    {
+      "device": "1862x1011",
+      "ip": "127.0.0.1",
+      "login_time": "2025-11-22 15:59:42",
+      "logout_time": null,
+      "duration": "Active"
+    },
+    {
+      "device": "1862x1011",
+      "ip": "127.0.0.1",
+      "login_time": "2025-11-22 15:59:20",
+      "logout_time": "2025-11-22 15:59:40",
+      "duration": "0m"
+    },
+    {
+      "device": "1862x1011",
+      "ip": "127.0.0.1",
+      "login_time": "2025-11-22 15:59:11",
+      "logout_time": "2025-11-22 15:59:17",
+      "duration": "0m"
+    },
+    {
+      "device": "1862x1011",
+      "ip": "127.0.0.1",
+      "login_time": "2025-11-22 15:58:12",
+      "logout_time": "2025-11-22 15:59:10",
+      "duration": "0m"
+    }
+  ]
+}

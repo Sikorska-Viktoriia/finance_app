@@ -19,7 +19,7 @@ def init_database():
     conn = sqlite3.connect(DB_NAME, check_same_thread=False)
     cursor = conn.cursor()
 
-    # Users table - звичайні ID
+    # Users table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -58,7 +58,7 @@ def init_database():
         )
     ''')
 
-    # User cards table - звичайні ID
+    # User cards table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS user_cards(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -134,12 +134,106 @@ def init_database():
         )
     ''')
 
+    # НОВІ ТАБЛИЦІ ДЛЯ АКАУНТА
+    # User profile photos table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS user_profile_photos(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            photo_path TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+    ''')
+    
+    # User sessions table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS user_sessions(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            device_info TEXT,
+            ip_address TEXT,
+            login_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            logout_time TIMESTAMP,
+            is_active INTEGER DEFAULT 1,
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+    ''')
+    
+    # User settings table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS user_settings(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            theme TEXT DEFAULT 'light',
+            language TEXT DEFAULT 'ukrainian',
+            notifications_enabled INTEGER DEFAULT 1,
+            biometric_auth INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+    ''')
+    
+    # User levels table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS user_levels(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            level INTEGER DEFAULT 1,
+            experience INTEGER DEFAULT 0,
+            achievements TEXT DEFAULT '[]',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+    ''')
+    
+    # User security logs table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS security_logs(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            action_type TEXT NOT NULL,
+            description TEXT,
+            ip_address TEXT,
+            device_info TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+    ''')
+
+    # ДОДАЙТЕ ЦЮ ТАБЛИЦЮ ДЛЯ AI ЧАТУ
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS ai_chat_history(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            message TEXT NOT NULL,
+            response TEXT NOT NULL,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+    ''')
+
+    # Wallets table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS wallets(
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            balance REAL DEFAULT 0.0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users (id)
+        )
+    ''')
+
     conn.commit()
     return conn, cursor
 
 def fix_database_schema(conn, cursor):
     """Fix database schema by adding missing columns"""
     try:
+        # Check and add missing columns to transactions table
         cursor.execute("PRAGMA table_info(transactions)")
         columns = [column[1] for column in cursor.fetchall()]
         
@@ -148,7 +242,7 @@ def fix_database_schema(conn, cursor):
         
         conn.commit()
     except Exception as e:
-        pass
+        print(f"Schema fix error: {e}")
 
 # Security & Validation Functions
 def is_valid_email(email):
@@ -209,15 +303,29 @@ def create_user(cursor, conn, username, email, password):
         
         user_id = cursor.lastrowid
         
+        # Create wallet for user
         cursor.execute(
             "INSERT INTO wallets (user_id, balance) VALUES (?, ?)",
             (user_id, 0.0)
+        )
+        
+        # Create default settings
+        cursor.execute(
+            "INSERT INTO user_settings (user_id) VALUES (?)",
+            (user_id,)
+        )
+        
+        # Create default level entry
+        cursor.execute(
+            "INSERT INTO user_levels (user_id) VALUES (?)",
+            (user_id,)
         )
         
         conn.commit()
         return user_id, "Користувача успішно створено"
         
     except Exception as e:
+        print(f"Error creating user: {e}")
         return None, "Помилка створення користувача"
 
 def get_user_by_email(cursor, email):
@@ -239,11 +347,379 @@ def get_user_by_email(cursor, email):
             }
         return None
     except Exception as e:
+        print(f"Error getting user by email: {e}")
         return None
+
+# НОВІ ФУНКЦІЇ ДЛЯ АКАУНТА
+def save_profile_photo(cursor, conn, user_id, photo_path):
+    """Save user profile photo path to database."""
+    try:
+        # Delete old photo if exists
+        cursor.execute("DELETE FROM user_profile_photos WHERE user_id=?", (user_id,))
+        
+        cursor.execute(
+            "INSERT INTO user_profile_photos (user_id, photo_path) VALUES (?, ?)",
+            (user_id, photo_path)
+        )
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error saving profile photo: {e}")
+        return False
+
+def get_profile_photo(cursor, user_id):
+    """Get user profile photo path."""
+    try:
+        cursor.execute(
+            "SELECT photo_path FROM user_profile_photos WHERE user_id=? ORDER BY created_at DESC LIMIT 1",
+            (user_id,)
+        )
+        result = cursor.fetchone()
+        return result[0] if result else None
+    except Exception as e:
+        print(f"Error getting profile photo: {e}")
+        return None
+
+def log_user_session(cursor, conn, user_id, device_info="", ip_address=""):
+    """Log user login session."""
+    try:
+        # Deactivate old sessions
+        cursor.execute(
+            "UPDATE user_sessions SET is_active=0 WHERE user_id=?",
+            (user_id,)
+        )
+        
+        cursor.execute(
+            "INSERT INTO user_sessions (user_id, device_info, ip_address) VALUES (?, ?, ?)",
+            (user_id, device_info, ip_address)
+        )
+        conn.commit()
+        return cursor.lastrowid
+    except Exception as e:
+        print(f"Error logging user session: {e}")
+        return None
+
+def log_user_logout(cursor, conn, session_id):
+    """Log user logout."""
+    try:
+        cursor.execute(
+            "UPDATE user_sessions SET logout_time=CURRENT_TIMESTAMP, is_active=0 WHERE id=?",
+            (session_id,)
+        )
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error logging user logout: {e}")
+        return False
+
+def get_login_history(cursor, user_id, limit=10):
+    """Get user login history."""
+    try:
+        cursor.execute('''
+            SELECT device_info, ip_address, login_time, logout_time 
+            FROM user_sessions 
+            WHERE user_id=? 
+            ORDER BY login_time DESC 
+            LIMIT ?
+        ''', (user_id, limit))
+        
+        sessions = cursor.fetchall()
+        result = []
+        
+        for session in sessions:
+            device_info, ip_address, login_time, logout_time = session
+            result.append({
+                'device': device_info or "Unknown Device",
+                'ip': ip_address or "Unknown IP",
+                'login_time': login_time,
+                'logout_time': logout_time,
+                'duration': calculate_session_duration(login_time, logout_time)
+            })
+        
+        return result
+    except Exception as e:
+        print(f"Error getting login history: {e}")
+        return []
+
+def calculate_session_duration(login_time, logout_time):
+    """Calculate session duration."""
+    try:
+        if not logout_time:
+            return "Active"
+        
+        login_dt = datetime.strptime(login_time, '%Y-%m-%d %H:%M:%S')
+        logout_dt = datetime.strptime(logout_time, '%Y-%m-%d %H:%M:%S')
+        duration = logout_dt - login_dt
+        
+        hours = duration.seconds // 3600
+        minutes = (duration.seconds % 3600) // 60
+        
+        if hours > 0:
+            return f"{hours}h {minutes}m"
+        else:
+            return f"{minutes}m"
+    except:
+        return "Unknown"
+
+def get_user_settings(cursor, user_id):
+    """Get user settings."""
+    try:
+        cursor.execute(
+            "SELECT theme, language, notifications_enabled, biometric_auth FROM user_settings WHERE user_id=?",
+            (user_id,)
+        )
+        result = cursor.fetchone()
+        
+        if result:
+            theme, language, notifications, biometric = result
+            return {
+                'theme': theme,
+                'language': language,
+                'notifications_enabled': bool(notifications),
+                'biometric_auth': bool(biometric)
+            }
+        else:
+            # Create default settings if not exist
+            cursor.execute(
+                "INSERT INTO user_settings (user_id) VALUES (?)",
+                (user_id,)
+            )
+            conn.commit()
+            return {
+                'theme': 'light',
+                'language': 'ukrainian',
+                'notifications_enabled': True,
+                'biometric_auth': False
+            }
+    except Exception as e:
+        print(f"Error getting user settings: {e}")
+        return {
+            'theme': 'light',
+            'language': 'ukrainian',
+            'notifications_enabled': True,
+            'biometric_auth': False
+        }
+
+def update_user_settings(cursor, conn, user_id, theme=None, language=None, notifications_enabled=None, biometric_auth=None):
+    """Update user settings."""
+    try:
+        # Check if settings exist
+        cursor.execute("SELECT id FROM user_settings WHERE user_id=?", (user_id,))
+        existing = cursor.fetchone()
+        
+        if existing:
+            # Update existing
+            update_fields = []
+            params = []
+            
+            if theme is not None:
+                update_fields.append("theme=?")
+                params.append(theme)
+            if language is not None:
+                update_fields.append("language=?")
+                params.append(language)
+            if notifications_enabled is not None:
+                update_fields.append("notifications_enabled=?")
+                params.append(1 if notifications_enabled else 0)
+            if biometric_auth is not None:
+                update_fields.append("biometric_auth=?")
+                params.append(1 if biometric_auth else 0)
+            
+            if update_fields:
+                update_fields.append("updated_at=CURRENT_TIMESTAMP")
+                query = f"UPDATE user_settings SET {', '.join(update_fields)} WHERE user_id=?"
+                params.append(user_id)
+                cursor.execute(query, params)
+        else:
+            # Insert new
+            cursor.execute('''
+                INSERT INTO user_settings 
+                (user_id, theme, language, notifications_enabled, biometric_auth) 
+                VALUES (?, ?, ?, ?, ?)
+            ''', (
+                user_id,
+                theme or 'light',
+                language or 'ukrainian',
+                1 if notifications_enabled is not False else 0,
+                1 if biometric_auth else 0
+            ))
+        
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error updating user settings: {e}")
+        return False
+
+def get_user_level(cursor, user_id):
+    """Get user level and experience."""
+    try:
+        cursor.execute(
+            "SELECT level, experience, achievements FROM user_levels WHERE user_id=?",
+            (user_id,)
+        )
+        result = cursor.fetchone()
+        
+        if result:
+            level, experience, achievements = result
+            return {
+                'level': level,
+                'experience': experience,
+                'achievements': json.loads(achievements) if achievements else [],
+                'next_level_xp': level * 100,
+                'progress_percentage': min((experience / (level * 100)) * 100, 100) if level > 0 else 0
+            }
+        else:
+            # Create default level entry if not exist
+            cursor.execute(
+                "INSERT INTO user_levels (user_id) VALUES (?)",
+                (user_id,)
+            )
+            conn.commit()
+            return {
+                'level': 1,
+                'experience': 0,
+                'achievements': [],
+                'next_level_xp': 100,
+                'progress_percentage': 0
+            }
+    except Exception as e:
+        print(f"Error getting user level: {e}")
+        return {
+            'level': 1,
+            'experience': 0,
+            'achievements': [],
+            'next_level_xp': 100,
+            'progress_percentage': 0
+        }
+
+def update_user_experience(cursor, conn, user_id, xp_gained, achievement=None):
+    """Update user experience and check for level up."""
+    try:
+        cursor.execute("SELECT level, experience, achievements FROM user_levels WHERE user_id=?", (user_id,))
+        result = cursor.fetchone()
+        
+        if result:
+            level, experience, achievements_json = result
+            achievements = json.loads(achievements_json) if achievements_json else []
+            
+            new_experience = experience + xp_gained
+            new_level = level
+            
+            # Check for level up
+            while new_experience >= new_level * 100:
+                new_experience -= new_level * 100
+                new_level += 1
+            
+            # Add achievement if provided
+            if achievement and achievement not in achievements:
+                achievements.append(achievement)
+            
+            cursor.execute('''
+                UPDATE user_levels 
+                SET level=?, experience=?, achievements=?, updated_at=CURRENT_TIMESTAMP 
+                WHERE user_id=?
+            ''', (new_level, new_experience, json.dumps(achievements), user_id))
+            
+        else:
+            # Create new entry
+            achievements = [achievement] if achievement else []
+            cursor.execute('''
+                INSERT INTO user_levels (user_id, level, experience, achievements)
+                VALUES (?, 1, ?, ?)
+            ''', (user_id, xp_gained, json.dumps(achievements)))
+        
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error updating user experience: {e}")
+        return False
+
+def log_security_action(cursor, conn, user_id, action_type, description="", ip_address="", device_info=""):
+    """Log security-related actions."""
+    try:
+        cursor.execute('''
+            INSERT INTO security_logs (user_id, action_type, description, ip_address, device_info)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (user_id, action_type, description, ip_address, device_info))
+        
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Error logging security action: {e}")
+        return False
+
+def export_user_data(cursor, user_id):
+    """Export all user data as JSON."""
+    try:
+        # Get user basic info
+        cursor.execute("SELECT username, email, created_at FROM users WHERE id=?", (user_id,))
+        user_info = cursor.fetchone()
+        
+        if not user_info:
+            return None
+        
+        username, email, created_at = user_info
+        
+        # Build export data
+        export_data = {
+            'export_info': {
+                'export_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                'user_id': user_id,
+                'username': username
+            },
+            'profile': {
+                'username': username,
+                'email': email,
+                'registration_date': created_at,
+                'profile_photo': get_profile_photo(cursor, user_id)
+            },
+            'financial_data': {
+                'cards': get_user_cards(cursor, user_id),
+                'transactions': get_user_transactions(cursor, user_id, limit=1000),
+                'envelopes': get_user_envelopes(cursor, user_id),
+                'savings_plans': get_user_savings_plans(cursor, user_id)
+            },
+            'settings': get_user_settings(cursor, user_id),
+            'levels': get_user_level(cursor, user_id),
+            'sessions': get_login_history(cursor, user_id, limit=50)
+        }
+        
+        return export_data
+        
+    except Exception as e:
+        print(f"Error exporting user data: {e}")
+        return None
+
+def get_user_savings_plans(cursor, user_id):
+    """Get user savings plans."""
+    try:
+        cursor.execute(
+            "SELECT id, name, target_amount, current_amount, deadline, status FROM savings_plans WHERE user_id=?",
+            (user_id,)
+        )
+        plans = cursor.fetchall()
+        
+        result = []
+        for plan in plans:
+            plan_id, name, target, current, deadline, status = plan
+            result.append({
+                'id': plan_id,
+                'name': name,
+                'target_amount': target,
+                'current_amount': current,
+                'progress_percentage': (current / target * 100) if target > 0 else 0,
+                'deadline': deadline,
+                'status': status
+            })
+        
+        return result
+    except Exception as e:
+        print(f"Error getting savings plans: {e}")
+        return []
 
 # Analytics Functions
 def get_analytics_data(cursor, user_id, period='month', category=None, card_id=None):
-    """Отримати дані для аналітики з фіксованою логікою"""
+    """Отримати дані для аналітики"""
     try:
         end_date = datetime.now()
         if period == 'today':
@@ -302,6 +778,7 @@ def get_analytics_data(cursor, user_id, period='month', category=None, card_id=N
         }
         
     except Exception as e:
+        print(f"Error getting analytics data: {e}")
         return {
             'total_income': 0,
             'total_expenses': 0,
@@ -388,6 +865,7 @@ def get_category_breakdown(cursor, user_id, period='month'):
         return result
         
     except Exception as e:
+        print(f"Error getting category breakdown: {e}")
         return []
 
 def get_top_categories(cursor, user_id, period='month', limit=5):
@@ -396,6 +874,7 @@ def get_top_categories(cursor, user_id, period='month', limit=5):
         category_data = get_category_breakdown(cursor, user_id, period)
         return category_data[:limit]
     except Exception as e:
+        print(f"Error getting top categories: {e}")
         return []
 
 def get_cards_analytics(cursor, user_id, period='month'):
@@ -452,6 +931,7 @@ def get_cards_analytics(cursor, user_id, period='month'):
         return cards_analytics
         
     except Exception as e:
+        print(f"Error getting cards analytics: {e}")
         return []
 
 def get_budget_progress(cursor, user_id):
@@ -478,6 +958,7 @@ def get_budget_progress(cursor, user_id):
         return budget_data
         
     except Exception as e:
+        print(f"Error getting budget progress: {e}")
         return []
 
 def get_insights_and_forecasts(cursor, user_id):
@@ -516,6 +997,7 @@ def get_insights_and_forecasts(cursor, user_id):
         return insights
         
     except Exception as e:
+        print(f"Error getting insights: {e}")
         return ["💡 Аналіз даних тимчасово недоступний"]
 
 def get_monthly_comparison(cursor, user_id, months=6):
@@ -550,6 +1032,7 @@ def get_monthly_comparison(cursor, user_id, months=6):
         return monthly_data
         
     except Exception as e:
+        print(f"Error getting monthly comparison: {e}")
         return []
 
 # Card Management Functions
@@ -573,13 +1056,11 @@ def create_user_card(cursor, conn, user_id, name, number, bank, balance=0.0, col
         
         return card_id
     except Exception as e:
+        print(f"Error creating user card: {e}")
         return None
 
 def get_user_cards(cursor, user_id):
-    """
-    Оновлено: Повертає повний зашифрований номер картки ('number') 
-    для подальшого розшифрування та маскування у HomeTab.
-    """
+    """Get all user cards"""
     try:
         cursor.execute(
             "SELECT id, name, number, bank, balance, color FROM user_cards WHERE user_id=?",
@@ -594,7 +1075,7 @@ def get_user_cards(cursor, user_id):
             result.append({
                 'id': card_id,
                 'name': name,
-                'number': number, # ТУТ ПОВЕРТАЄМО ЗАШИФРОВАНИЙ НОМЕР
+                'number': number,
                 'bank': bank,
                 'balance': balance,
                 'color': safe_color_conversion(color)
@@ -602,6 +1083,7 @@ def get_user_cards(cursor, user_id):
         
         return result
     except Exception as e:
+        print(f"Error getting user cards: {e}")
         return []
 
 def get_user_card_by_id(cursor, card_id):
@@ -629,6 +1111,7 @@ def get_user_card_by_id(cursor, card_id):
             }
         return None
     except Exception as e:
+        print(f"Error getting user card by id: {e}")
         return None
 
 def get_total_balance(cursor, user_id):
@@ -642,6 +1125,7 @@ def get_total_balance(cursor, user_id):
         total = result[0] if result and result[0] is not None else 0.0
         return total
     except Exception as e:
+        print(f"Error getting total balance: {e}")
         return 0.0
 
 def update_card_balance(cursor, conn, card_id, amount, description=""):
@@ -672,6 +1156,7 @@ def update_card_balance(cursor, conn, card_id, amount, description=""):
         
         return True
     except Exception as e:
+        print(f"Error updating card balance: {e}")
         return False
 
 def delete_user_card(cursor, conn, card_id):
@@ -689,6 +1174,7 @@ def delete_user_card(cursor, conn, card_id):
         
         return True
     except Exception as e:
+        print(f"Error deleting user card: {e}")
         return False
 
 def update_user_card(cursor, conn, card_id, name=None, number=None, bank=None, balance=None, color=None):
@@ -725,6 +1211,7 @@ def update_user_card(cursor, conn, card_id, name=None, number=None, bank=None, b
         conn.commit()
         return True
     except Exception as e:
+        print(f"Error updating user card: {e}")
         return False
 
 def transfer_money_between_cards(cursor, conn, from_card_id, to_card_id, amount):
@@ -761,6 +1248,7 @@ def transfer_money_between_cards(cursor, conn, from_card_id, to_card_id, amount)
         
         return True, "Переказ успішний"
     except Exception as e:
+        print(f"Error transferring money: {e}")
         return False, "Помилка переказу"
 
 def log_transaction(cursor, conn, user_id, transaction_type, amount, description="", card_id=None):
@@ -789,6 +1277,7 @@ def log_transaction(cursor, conn, user_id, transaction_type, amount, description
         return True
         
     except Exception as e:
+        print(f"Error logging transaction: {e}")
         return False
     
 def update_envelope(cursor, conn, envelope_id, name=None, budget_limit=None):
@@ -814,6 +1303,7 @@ def update_envelope(cursor, conn, envelope_id, name=None, budget_limit=None):
         conn.commit()
         return True
     except Exception as e:
+        print(f"Error updating envelope: {e}")
         return False
     
 def get_user_transactions(cursor, user_id, limit=50):
@@ -843,6 +1333,7 @@ def get_user_transactions(cursor, user_id, limit=50):
         
         return result
     except Exception as e:
+        print(f"Error getting user transactions: {e}")
         return []
 
 def log_savings_transaction(cursor, conn, user_id, plan_id, amount, trans_type, description=""):
@@ -854,7 +1345,7 @@ def log_savings_transaction(cursor, conn, user_id, plan_id, amount, trans_type, 
         )
         conn.commit()
     except Exception as e:
-        pass
+        print(f"Error logging savings transaction: {e}")
 
 def create_envelope(cursor, conn, user_id, name, color=None, budget_limit=0.0):
     """Create a new envelope for user."""
@@ -871,6 +1362,7 @@ def create_envelope(cursor, conn, user_id, name, color=None, budget_limit=0.0):
         conn.commit()
         return cursor.lastrowid
     except Exception as e:
+        print(f"Error creating envelope: {e}")
         return None
 
 def get_user_envelopes(cursor, user_id):
@@ -896,6 +1388,7 @@ def get_user_envelopes(cursor, user_id):
         
         return result
     except Exception as e:
+        print(f"Error getting user envelopes: {e}")
         return []
 
 def add_to_envelope(cursor, conn, user_id, envelope_id, amount, description="", card_id=None):
@@ -918,6 +1411,7 @@ def add_to_envelope(cursor, conn, user_id, envelope_id, amount, description="", 
         conn.commit()
         return True
     except Exception as e:
+        print(f"Error adding to envelope: {e}")
         return False
 
 def get_envelope_name(cursor, envelope_id):
@@ -926,7 +1420,8 @@ def get_envelope_name(cursor, envelope_id):
         cursor.execute("SELECT name FROM envelopes WHERE id=?", (envelope_id,))
         result = cursor.fetchone()
         return result[0] if result else "Unknown"
-    except:
+    except Exception as e:
+        print(f"Error getting envelope name: {e}")
         return "Unknown"
 
 def get_envelope_transactions(cursor, user_id, envelope_id=None, limit=50):
@@ -964,6 +1459,7 @@ def get_envelope_transactions(cursor, user_id, envelope_id=None, limit=50):
         
         return result
     except Exception as e:
+        print(f"Error getting envelope transactions: {e}")
         return []
 
 def get_envelope_stats(cursor, user_id):
@@ -998,6 +1494,7 @@ def get_envelope_stats(cursor, user_id):
         
         return result
     except Exception as e:
+        print(f"Error getting envelope stats: {e}")
         return []
 
 def debug_transactions(cursor, user_id):
@@ -1010,11 +1507,11 @@ def debug_transactions(cursor, user_id):
         transactions = cursor.fetchall()
         return transactions
     except Exception as e:
+        print(f"Error debugging transactions: {e}")
         return []
 
 # Initialize and export connection objects
 conn, cursor = init_database()
-
 fix_database_schema(conn, cursor)
 
 os.environ['KIVY_NO_MTDEV'] = '1'
@@ -1032,5 +1529,12 @@ __all__ = [
     # Analytics functions
     'get_analytics_data', 'get_category_breakdown', 'get_top_categories', 
     'get_cards_analytics', 'get_budget_progress', 'get_insights_and_forecasts', 'get_monthly_comparison',
-    'debug_transactions'
+    'debug_transactions',
+    # New account functions
+    'save_profile_photo', 'get_profile_photo',
+    'log_user_session', 'log_user_logout', 'get_login_history',
+    'get_user_settings', 'update_user_settings',
+    'get_user_level', 'update_user_experience',
+    'log_security_action', 'export_user_data',
+    'get_user_savings_plans'
 ]
