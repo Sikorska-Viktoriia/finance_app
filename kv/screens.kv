@@ -98,6 +98,126 @@
             rounded_rectangle: [self.x, self.y, self.width, self.height, adaptive_dp(10)]
             width: 1
 
+<PasswordChangeDialog@ModalView>:
+    size_hint: (0.85, 0.6)
+    auto_dismiss: False
+    background: ''
+    
+    BoxLayout:
+        orientation: 'vertical'
+        padding: dp(20)
+        spacing: dp(15)
+        canvas.before:
+            Color:
+                rgba: WHITE_BG
+            RoundedRectangle:
+                pos: self.pos
+                size: self.size
+                radius: [dp(20),]
+        
+        Label:
+            text: 'Зміна паролю'
+            font_size: dp(20)
+            bold: True
+            color: PRIMARY_PINK
+            size_hint_y: None
+            height: dp(40)
+        
+        PasswordTextInput:
+            id: current_password
+            hint_text: 'Поточний пароль'
+        
+        PasswordTextInput:
+            id: new_password
+            hint_text: 'Новий пароль'
+        
+        PasswordTextInput:
+            id: confirm_password
+            hint_text: 'Підтвердіть новий пароль'
+        
+        BoxLayout:
+            orientation: 'horizontal'
+            spacing: dp(10)
+            size_hint_y: None
+            height: dp(50)
+            
+            StyledButton:
+                text: 'Скасувати'
+                background_color: (0.8, 0.8, 0.8, 1)
+                on_press: root.dismiss()
+            
+            StyledButton:
+                text: 'Зберегти'
+                background_color: PRIMARY_PINK
+                on_press: app.root.get_screen('dashboard_screen').ids.tab_manager.get_screen('account').save_new_password()
+
+<DeleteAccountDialog@ModalView>:
+    size_hint: (0.8, 0.4)
+    auto_dismiss: False
+    background: ''
+    
+    BoxLayout:
+        orientation: 'vertical'
+        padding: dp(20)
+        spacing: dp(15)
+        canvas.before:
+            Color:
+                rgba: WHITE_BG
+            RoundedRectangle:
+                pos: self.pos
+                size: self.size
+                radius: [dp(20),]
+        
+        Label:
+            text: 'Видалення акаунту'
+            font_size: dp(20)
+            bold: True
+            color: ERROR_RED
+            size_hint_y: None
+            height: dp(40)
+        
+        Label:
+            text: 'Ця дія незворотна! Ви впевнені, що хочете видалити свій акаунт і всі дані?'
+            font_size: dp(14)
+            color: DARK_TEXT
+            text_size: self.width, None
+            halign: 'center'
+            valign: 'middle'
+        
+        BoxLayout:
+            orientation: 'horizontal'
+            spacing: dp(10)
+            size_hint_y: None
+            height: dp(50)
+            
+            StyledButton:
+                text: 'Скасувати'
+                background_color: (0.8, 0.8, 0.8, 1)
+                on_press: root.dismiss()
+            
+            StyledButton:
+                text: 'Видалити'
+                background_color: ERROR_RED
+                on_press: app.root.get_screen('dashboard_screen').ids.tab_manager.get_screen('account').confirm_delete_account()
+
+<SettingItem@BoxLayout>:
+    orientation: 'horizontal'
+    size_hint_y: None
+    height: dp(50)
+    padding: [dp(10), 0]
+    
+    Label:
+        text: root.setting_name
+        font_size: dp(16)
+        color: DARK_TEXT
+        size_hint_x: 0.7
+        text_size: self.width, None
+        halign: 'left'
+        valign: 'middle'
+    
+    BoxLayout:
+        size_hint_x: 0.3
+
 <PasswordTextInput>:
     size_hint_y: None
     height: adaptive_dp(55) if not is_small_screen else adaptive_dp(45)
@@ -898,7 +1018,7 @@
             text_size: self.width, None
 
 <AccountTab>:
-    name: "account_tab"
+    name: "account_tab"  # Змінено з "account" на "account_tab"
     canvas.before:
         Color:
             rgba: LIGHT_BLUE
@@ -908,51 +1028,296 @@
     
     BoxLayout:
         orientation: 'vertical'
-        padding: adaptive_padding(40)
-        spacing: adaptive_dp(20)
+        padding: adaptive_padding(15)
+        spacing: adaptive_dp(10)
         
-        LoginFormLogo:
-            height: adaptive_dp(120) if not is_small_screen else adaptive_dp(90)
-        
+        # Заголовок
         Label:
-            text: "Account Settings"
+            text: "Мій Профіль"
             font_size: adaptive_font(28) if not is_small_screen else adaptive_font(24)
             bold: True
             color: PRIMARY_PINK
             size_hint_y: None
-            height: adaptive_dp(40)
+            height: adaptive_dp(50)
         
-        Widget:
+        ScrollView:
+            do_scroll_x: False
+            bar_width: adaptive_dp(8)
+            bar_color: PRIMARY_BLUE
+            
+            BoxLayout:
+                orientation: 'vertical'
+                spacing: adaptive_dp(15)
+                size_hint_y: None
+                height: self.minimum_height
+                padding: [0, 0, adaptive_dp(5), 0]
+                
+                # 👤 1. Основна інформація профілю
+                GradientBox:
+                    color1: LIGHT_PINK
+                    orientation: 'vertical'
+                    padding: adaptive_padding(20)
+                    spacing: adaptive_dp(15)
+                    
+                    Label:
+                        text: "👤 Особиста інформація"
+                        font_size: adaptive_font(18)
+                        bold: True
+                        color: PRIMARY_PINK
+                        size_hint_y: None
+                        height: adaptive_dp(30)
+                    
+                    BoxLayout:
+                        orientation: 'horizontal'
+                        size_hint_y: None
+                        height: adaptive_dp(60)
+                        
+                        BoxLayout:
+                            orientation: 'vertical'
+                            size_hint_x: 0.8
+                            spacing: dp(5)
+                            
+                            Label:
+                                id: username_label
+                                text: "Користувач"
+                                font_size: adaptive_font(18)
+                                bold: True
+                                color: DARK_TEXT
+                                size_hint_y: None
+                                height: adaptive_dp(25)
+                                text_size: self.width, None
+                                halign: 'left'
+                            
+                            Label:
+                                id: email_label
+                                text: "Email"
+                                font_size: adaptive_font(14)
+                                color: DARK_TEXT
+                                size_hint_y: None
+                                height: adaptive_dp(20)
+                                text_size: self.width, None
+                                halign: 'left'
+                            
+                            Label:
+                                id: last_login
+                                text: "Останній вхід: сьогодні"
+                                font_size: adaptive_font(12)
+                                color: (0.5, 0.5, 0.5, 1)
+                                size_hint_y: None
+                                height: adaptive_dp(18)
+                                text_size: self.width, None
+                                halign: 'left'
+                        
+                        BoxLayout:
+                            orientation: 'vertical'
+                            size_hint_x: 0.2
+                            spacing: dp(5)
+                            
+                            StyledButton:
+                                text: "✏️"
+                                background_color: PRIMARY_BLUE
+                                size_hint_y: None
+                                height: adaptive_dp(30)
+                                font_size: adaptive_font(12)
+                                on_press: root.edit_profile()
+                            
+                            StyledButton:
+                                text: "🔒"
+                                background_color: PRIMARY_PINK
+                                size_hint_y: None
+                                height: adaptive_dp(30)
+                                font_size: adaptive_font(12)
+                                on_press: root.change_password()
+                
+                # ⚙️ 2. Налаштування акаунту
+                GradientBox:
+                    color1: LIGHT_BLUE
+                    orientation: 'vertical'
+                    padding: adaptive_padding(20)
+                    spacing: adaptive_dp(15)
+                    
+                    Label:
+                        text: "⚙️ Налаштування"
+                        font_size: adaptive_font(18)
+                        bold: True
+                        color: PRIMARY_BLUE
+                        size_hint_y: None
+                        height: adaptive_dp(30)
+                    
+                    # Темна тема
+                    BoxLayout:
+                        orientation: 'horizontal'
+                        size_hint_y: None
+                        height: adaptive_dp(40)
+                        
+                        Label:
+                            text: "Темна тема"
+                            font_size: adaptive_font(16)
+                            color: DARK_TEXT
+                            size_hint_x: 0.7
+                            text_size: self.width, None
+                            halign: 'left'
+                            valign: 'middle'
+                        
+                        Switch:
+                            id: dark_mode_switch
+                            size_hint_x: 0.3
+                            on_active: root.toggle_dark_mode(self)
+                    
+                    # Мова інтерфейсу
+                    BoxLayout:
+                        orientation: 'horizontal'
+                        size_hint_y: None
+                        height: adaptive_dp(40)
+                        
+                        Label:
+                            text: "Мова інтерфейсу"
+                            font_size: adaptive_font(16)
+                            color: DARK_TEXT
+                            size_hint_x: 0.7
+                            text_size: self.width, None
+                            halign: 'left'
+                            valign: 'middle'
+                        
+                        Spinner:
+                            id: language_spinner
+                            size_hint_x: 0.3
+                            text: "Українська"
+                            values: ["Українська", "English", "Polski", "Deutsch"]
+                            on_text: root.change_language(self)
+                    
+                    # Сповіщення
+                    BoxLayout:
+                        orientation: 'horizontal'
+                        size_hint_y: None
+                        height: adaptive_dp(40)
+                        
+                        Label:
+                            text: "Сповіщення"
+                            font_size: adaptive_font(16)
+                            color: DARK_TEXT
+                            size_hint_x: 0.7
+                            text_size: self.width, None
+                            halign: 'left'
+                            valign: 'middle'
+                        
+                        Switch:
+                            id: notifications_switch
+                            size_hint_x: 0.3
+                            active: True
+                            on_active: root.toggle_notifications(self)
+                
+                # 📦 3. Дії з акаунтом
+                GradientBox:
+                    color1: (0.95, 0.95, 0.8, 1)  # Світло-жовтий
+                    orientation: 'vertical'
+                    padding: adaptive_padding(20)
+                    spacing: adaptive_dp(12)
+                    
+                    Label:
+                        text: "📦 Дії з акаунтом"
+                        font_size: adaptive_font(18)
+                        bold: True
+                        color: (0.7, 0.6, 0.2, 1)
+                        size_hint_y: None
+                        height: adaptive_dp(30)
+                    
+                    StyledButton:
+                        text: "📥 Експортувати дані (JSON)"
+                        background_color: PRIMARY_BLUE
+                        size_hint_y: None
+                        height: adaptive_dp(45)
+                        on_press: root.export_data()
+                    
+                    StyledButton:
+                        text: "📋 Переглянути історію входів"
+                        background_color: PRIMARY_PINK
+                        size_hint_y: None
+                        height: adaptive_dp(45)
+                        on_press: root.view_login_history()
+                    
+                    StyledButton:
+                        text: "🚪 Вийти з усіх пристроїв"
+                        background_color: (0.9, 0.6, 0.2, 1)
+                        size_hint_y: None
+                        height: adaptive_dp(45)
+                        on_press: root.logout_all_devices()
+                
+                # 👤 4. Безпека
+                GradientBox:
+                    color1: (0.95, 0.9, 0.95, 1)  # Світло-фіолетовий
+                    orientation: 'vertical'
+                    padding: adaptive_padding(20)
+                    spacing: adaptive_dp(12)
+                    
+                    Label:
+                        text: "👤 Безпека"
+                        font_size: adaptive_font(18)
+                        bold: True
+                        color: (0.7, 0.3, 0.7, 1)
+                        size_hint_y: None
+                        height: adaptive_dp(30)
+                    
+                    StyledButton:
+                        text: "🔐 Двофакторна автентифікація"
+                        background_color: PRIMARY_BLUE
+                        size_hint_y: None
+                        height: adaptive_dp(45)
+                        on_press: root.enable_2fa()
+                    
+                    StyledButton:
+                        text: "💾 Автоматичне резервне копіювання"
+                        background_color: PRIMARY_PINK
+                        size_hint_y: None
+                        height: adaptive_dp(45)
+                        on_press: root.backup_data()
+                
+                # 🗑️ 5. Небезпечні дії
+                GradientBox:
+                    color1: (1, 0.9, 0.9, 1)  # Світло-червоний
+                    orientation: 'vertical'
+                    padding: adaptive_padding(20)
+                    spacing: adaptive_dp(12)
+                    
+                    Label:
+                        text: "🗑️ Небезпечні дії"
+                        font_size: adaptive_font(18)
+                        bold: True
+                        color: ERROR_RED
+                        size_hint_y: None
+                        height: adaptive_dp(30)
+                    
+                    StyledButton:
+                        text: "❌ Видалити акаунт"
+                        background_color: ERROR_RED
+                        size_hint_y: None
+                        height: adaptive_dp(45)
+                        on_press: root.delete_account()
         
-        BoxLayout:
-            orientation: 'vertical'
-            spacing: adaptive_dp(15)
+        # Повідомлення
+        Label:
+            id: account_message
+            text: ""
             size_hint_y: None
-            height: adaptive_dp(200) if not is_small_screen else adaptive_dp(160)
-            
-            Label:
-                id: username_label
-                text: "Username: "
-                font_size: adaptive_font(18) if not is_small_screen else adaptive_font(16)
-                color: PRIMARY_PINK
-                size_hint_y: None
-                height: adaptive_dp(30)
-            
-            Label:
-                id: email_label
-                text: "Email: "
-                font_size: adaptive_font(18) if not is_small_screen else adaptive_font(16)
-                color: PRIMARY_BLUE
-                size_hint_y: None
-                height: adaptive_dp(30)
-            
-            Widget:
-            
-            StyledButton:
-                text: "Logout"
-                background_color: PRIMARY_PINK
-                height: adaptive_dp(60) if not is_small_screen else adaptive_dp(50)
-                on_press: root.logout()
+            height: adaptive_dp(30)
+            text_size: self.width, None
+            halign: 'center'
+            valign: 'middle'
+            font_size: adaptive_font(14)
+        
+        # Кнопка виходу
+        StyledButton:
+            text: "🚪 Вийти з акаунту"
+            background_color: (0.7, 0.7, 0.7, 1)
+            size_hint_y: None
+            height: adaptive_dp(60) if not is_small_screen else adaptive_dp(50)
+            on_press: root.logout()
+
+    PasswordChangeDialog:
+        id: password_dialog
+    
+    DeleteAccountDialog:
+        id: delete_dialog
 
 # ГОЛОВНИЙ ДАШБОРД
 <DashboardScreen>:

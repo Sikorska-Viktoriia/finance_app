@@ -6,6 +6,7 @@ import os
 import json
 import string
 import secrets
+import traceback
 
 # -----------------------
 # Database Initialization
@@ -139,18 +140,15 @@ def init_database():
 def fix_database_schema(conn, cursor):
     """Fix database schema by adding missing columns"""
     try:
-        # Додаємо колонку card_id до таблиці transactions, якщо її немає
         cursor.execute("PRAGMA table_info(transactions)")
         columns = [column[1] for column in cursor.fetchall()]
         
         if 'card_id' not in columns:
             cursor.execute("ALTER TABLE transactions ADD COLUMN card_id INTEGER")
-            print("Додано колонку card_id до таблиці transactions")
         
         conn.commit()
-        print("Схема бази даних оновлена успішно")
     except Exception as e:
-        print(f"Помилка оновлення схеми бази даних: {e}")
+        pass
 
 # Security & Validation Functions
 def is_valid_email(email):
@@ -198,24 +196,19 @@ def create_user(cursor, conn, username, email, password):
         if not is_valid_password(password):
             return None, "Пароль має містити принаймні 6 символів"
         
-        # Перевіряємо унікальність email
         cursor.execute("SELECT COUNT(*) FROM users WHERE email=?", (email,))
         if cursor.fetchone()[0] > 0:
             return None, "Користувач з таким email вже існує"
         
-        # Хешуємо пароль
         password_hashed = hash_password(password)
         
-        # Додаємо користувача
         cursor.execute(
             "INSERT INTO users (username, email, password) VALUES (?, ?, ?)",
             (username, email, password_hashed)
         )
         
-        # Отримуємо ID нового користувача
         user_id = cursor.lastrowid
         
-        # Створюємо гаманець для користувача
         cursor.execute(
             "INSERT INTO wallets (user_id, balance) VALUES (?, ?)",
             (user_id, 0.0)
@@ -225,7 +218,6 @@ def create_user(cursor, conn, username, email, password):
         return user_id, "Користувача успішно створено"
         
     except Exception as e:
-        print(f"Помилка створення користувача: {e}")
         return None, "Помилка створення користувача"
 
 def get_user_by_email(cursor, email):
@@ -247,14 +239,12 @@ def get_user_by_email(cursor, email):
             }
         return None
     except Exception as e:
-        print(f"Помилка отримання користувача: {e}")
         return None
 
 # Analytics Functions
 def get_analytics_data(cursor, user_id, period='month', category=None, card_id=None):
     """Отримати дані для аналітики з фіксованою логікою"""
     try:
-        # Розрахунок періоду
         end_date = datetime.now()
         if period == 'today':
             start_date = end_date.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -270,7 +260,6 @@ def get_analytics_data(cursor, user_id, period='month', category=None, card_id=N
         start_date_str = start_date.strftime('%Y-%m-%d %H:%M:%S')
         end_date_str = end_date.strftime('%Y-%m-%d %H:%M:%S')
 
-        # Отримуємо ВСІ транзакції за період
         cursor.execute('''
             SELECT type, amount, description, created_at 
             FROM transactions 
@@ -280,7 +269,6 @@ def get_analytics_data(cursor, user_id, period='month', category=None, card_id=N
         
         transactions = cursor.fetchall()
 
-        # Розраховуємо метрики
         total_income = 0
         total_expenses = 0
         transactions_count = len(transactions)
@@ -288,23 +276,18 @@ def get_analytics_data(cursor, user_id, period='month', category=None, card_id=N
         for trans in transactions:
             trans_type, amount, description, created_at = trans
             
-            # ВИПРАВЛЕНА ЛОГІКА: що вважати доходами, а що витратами
             if trans_type in ['deposit', 'card_deposit', 'transfer_in', 'income', 'savings_return', 'savings_completed']:
                 total_income += amount
             elif trans_type in ['withdrawal', 'transfer', 'transfer_out', 'expense', 'savings_deposit', 'envelope_deposit']:
                 total_expenses += amount
-            # Інші типи (login, logout, etc) ігноруємо
 
         net_balance = total_income - total_expenses
         
-        # Розраховуємо середні денні витрати
         days_in_period = (end_date - start_date).days or 1
         average_daily = total_expenses / days_in_period
 
-        # Отримуємо загальний баланс з карток
         total_balance = get_total_balance(cursor, user_id)
 
-        # Розраховуємо відсоток заощаджень
         savings_rate = (net_balance / total_income * 100) if total_income > 0 else 0
 
         return {
@@ -319,7 +302,6 @@ def get_analytics_data(cursor, user_id, period='month', category=None, card_id=N
         }
         
     except Exception as e:
-        print(f"Error getting analytics data: {e}")
         return {
             'total_income': 0,
             'total_expenses': 0,
@@ -334,7 +316,6 @@ def get_analytics_data(cursor, user_id, period='month', category=None, card_id=N
 def get_category_breakdown(cursor, user_id, period='month'):
     """Отримати розподіл по категоріях"""
     try:
-        # Розрахунок періоду
         end_date = datetime.now()
         if period == 'today':
             start_date = end_date.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -350,7 +331,6 @@ def get_category_breakdown(cursor, user_id, period='month'):
         start_date_str = start_date.strftime('%Y-%m-%d %H:%M:%S')
         end_date_str = end_date.strftime('%Y-%m-%d %H:%M:%S')
 
-        # Отримуємо транзакції витрат за період
         cursor.execute('''
             SELECT amount, description, created_at 
             FROM transactions 
@@ -360,7 +340,6 @@ def get_category_breakdown(cursor, user_id, period='month'):
         
         transactions = cursor.fetchall()
 
-        # Групуємо по категоріях (спрощено - по ключових словах в описі)
         categories = {
             'Food': {'amount': 0, 'color': [0.95, 0.3, 0.5, 1]},
             'Transport': {'amount': 0, 'color': [0.2, 0.7, 0.9, 1]},
@@ -391,7 +370,6 @@ def get_category_breakdown(cursor, user_id, period='month'):
             if not categorized:
                 categories['Other']['amount'] += amount
 
-        # Фільтруємо категорії з нульовими сумами та розраховуємо відсотки
         total_expenses = sum(cat['amount'] for cat in categories.values())
         
         result = []
@@ -405,13 +383,11 @@ def get_category_breakdown(cursor, user_id, period='month'):
                     'color': data['color']
                 })
 
-        # Сортуємо за сумою (від більшого до меншого)
         result.sort(key=lambda x: x['amount'], reverse=True)
         
         return result
         
     except Exception as e:
-        print(f"Error getting category breakdown: {e}")
         return []
 
 def get_top_categories(cursor, user_id, period='month', limit=5):
@@ -420,13 +396,11 @@ def get_top_categories(cursor, user_id, period='month', limit=5):
         category_data = get_category_breakdown(cursor, user_id, period)
         return category_data[:limit]
     except Exception as e:
-        print(f"Error getting top categories: {e}")
         return []
 
 def get_cards_analytics(cursor, user_id, period='month'):
     """Отримати аналітику по картках"""
     try:
-        # Розрахунок періоду
         end_date = datetime.now()
         if period == 'today':
             start_date = end_date.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -442,14 +416,12 @@ def get_cards_analytics(cursor, user_id, period='month'):
         start_date_str = start_date.strftime('%Y-%m-%d %H:%M:%S')
         end_date_str = end_date.strftime('%Y-%m-%d %H:%M:%S')
 
-        # Отримуємо всі картки користувача
         user_cards = get_user_cards(cursor, user_id)
         cards_analytics = []
 
         for card in user_cards:
             card_id = card['id']
             
-            # Доходи по картці
             cursor.execute('''
                 SELECT SUM(amount) 
                 FROM transactions 
@@ -459,7 +431,6 @@ def get_cards_analytics(cursor, user_id, period='month'):
             income_result = cursor.fetchone()
             income = income_result[0] or 0
 
-            # Витрати по картці
             cursor.execute('''
                 SELECT SUM(amount) 
                 FROM transactions 
@@ -481,7 +452,6 @@ def get_cards_analytics(cursor, user_id, period='month'):
         return cards_analytics
         
     except Exception as e:
-        print(f"Error getting cards analytics: {e}")
         return []
 
 def get_budget_progress(cursor, user_id):
@@ -508,7 +478,6 @@ def get_budget_progress(cursor, user_id):
         return budget_data
         
     except Exception as e:
-        print(f"Error getting budget progress: {e}")
         return []
 
 def get_insights_and_forecasts(cursor, user_id):
@@ -516,11 +485,9 @@ def get_insights_and_forecasts(cursor, user_id):
     try:
         insights = []
         
-        # Отримуємо дані за поточний та попередній місяць
         current_data = get_analytics_data(cursor, user_id, 'month')
-        previous_data = get_analytics_data(cursor, user_id, 'month')  # Тут має бути попередній місяць
+        previous_data = get_analytics_data(cursor, user_id, 'month')
         
-        # Аналіз бюджетів
         budgets = get_budget_progress(cursor, user_id)
         for budget in budgets:
             if budget['percentage'] > 90:
@@ -528,21 +495,18 @@ def get_insights_and_forecasts(cursor, user_id):
             elif budget['percentage'] > 75:
                 insights.append(f"🔔 Конверт '{budget['name']}' майже заповнений - {budget['percentage']}%")
         
-        # Аналіз трендів витрат
         if current_data['total_expenses'] > previous_data['total_expenses'] * 1.2:
             increase_percent = ((current_data['total_expenses'] - previous_data['total_expenses']) / previous_data['total_expenses'] * 100)
             insights.append(f"📈 Зростання витрат на {increase_percent:.1f}% порівняно з минулим місяцем")
         
-        # Прогноз на кінець місяця
         today = datetime.now()
         days_passed = today.day
-        days_in_month = 30  # Спрощено
+        days_in_month = 30
         daily_avg = current_data['average_daily']
         projected_expenses = daily_avg * days_in_month
         
         insights.append(f"🔮 Прогноз витрат до кінця місяця: ${projected_expenses:.2f}")
         
-        # Аналіз заощаджень
         savings_rate = current_data['savings_rate']
         if savings_rate > 20:
             insights.append(f"💰 Відмінно! Ваш рівень заощаджень: {savings_rate}%")
@@ -552,7 +516,6 @@ def get_insights_and_forecasts(cursor, user_id):
         return insights
         
     except Exception as e:
-        print(f"Error getting insights: {e}")
         return ["💡 Аналіз даних тимчасово недоступний"]
 
 def get_monthly_comparison(cursor, user_id, months=6):
@@ -564,7 +527,6 @@ def get_monthly_comparison(cursor, user_id, months=6):
             month_date = datetime.now() - timedelta(days=30*i)
             month_str = month_date.strftime('%Y-%m')
             
-            # Отримуємо дані за місяць
             cursor.execute('''
                 SELECT 
                     SUM(CASE WHEN type IN ('deposit', 'transfer_in', 'income') THEN amount ELSE 0 END) as income,
@@ -584,12 +546,10 @@ def get_monthly_comparison(cursor, user_id, months=6):
                 'savings': round(income - expenses, 2)
             })
         
-        # Реверсуємо, щоб від найстарішого до найновішого
         monthly_data.reverse()
         return monthly_data
         
     except Exception as e:
-        print(f"Error getting monthly comparison: {e}")
         return []
 
 # Card Management Functions
@@ -609,16 +569,17 @@ def create_user_card(cursor, conn, user_id, name, number, bank, balance=0.0, col
         
         card_id = cursor.lastrowid
         
-        # Логуємо створення картки
         log_transaction(cursor, conn, user_id, 'card_creation', 0, f"Створено картку {name}", card_id)
         
         return card_id
     except Exception as e:
-        print(f"Error creating user card: {e}")
         return None
 
 def get_user_cards(cursor, user_id):
-    """Get all cards for a user."""
+    """
+    Оновлено: Повертає повний зашифрований номер картки ('number') 
+    для подальшого розшифрування та маскування у HomeTab.
+    """
     try:
         cursor.execute(
             "SELECT id, name, number, bank, balance, color FROM user_cards WHERE user_id=?",
@@ -630,14 +591,10 @@ def get_user_cards(cursor, user_id):
         for card in cards:
             card_id, name, number, bank, balance, color = card
             
-            # Маскуємо номер картки (показуємо тільки останні 4 цифри для безпеки)
-            masked_number = f"**** **** **** {number[-4:]}" if number and len(number) >= 4 else "****"
-            
             result.append({
                 'id': card_id,
                 'name': name,
-                'number': masked_number,
-                'full_number': number,  # Тільки для внутрішнього використання
+                'number': number, # ТУТ ПОВЕРТАЄМО ЗАШИФРОВАНИЙ НОМЕР
                 'bank': bank,
                 'balance': balance,
                 'color': safe_color_conversion(color)
@@ -645,7 +602,6 @@ def get_user_cards(cursor, user_id):
         
         return result
     except Exception as e:
-        print(f"Error getting user cards: {e}")
         return []
 
 def get_user_card_by_id(cursor, card_id):
@@ -660,21 +616,19 @@ def get_user_card_by_id(cursor, card_id):
         if card:
             card_id, name, number, bank, balance, color = card
             
-            # Маскуємо номер картки
             masked_number = f"**** **** **** {number[-4:]}" if number and len(number) >= 4 else "****"
             
             return {
                 'id': card_id,
                 'name': name,
                 'number': masked_number,
-                'full_number': number,  # Тільки для внутрішнього використання
+                'full_number': number,
                 'bank': bank,
                 'balance': balance,
                 'color': safe_color_conversion(color)
             }
         return None
     except Exception as e:
-        print(f"Error getting card by ID: {e}")
         return None
 
 def get_total_balance(cursor, user_id):
@@ -688,13 +642,11 @@ def get_total_balance(cursor, user_id):
         total = result[0] if result and result[0] is not None else 0.0
         return total
     except Exception as e:
-        print(f"Error getting total balance: {e}")
         return 0.0
 
 def update_card_balance(cursor, conn, card_id, amount, description=""):
     """Update card balance by adding amount"""
     try:
-        # Отримуємо інформацію про картку
         cursor.execute("SELECT user_id, name, balance FROM user_cards WHERE id=?", (card_id,))
         card_info = cursor.fetchone()
         
@@ -704,14 +656,12 @@ def update_card_balance(cursor, conn, card_id, amount, description=""):
         user_id, card_name, current_balance = card_info
         new_balance = current_balance + amount
         
-        # Оновлюємо баланс
         cursor.execute(
             "UPDATE user_cards SET balance=? WHERE id=?",
             (new_balance, card_id)
         )
         conn.commit()
         
-        # Логуємо операцію ТІЛЬКИ якщо це не поповнення конверту (щоб уникнути дублювання)
         if not description.startswith("(") or "конверт" not in description.lower():
             trans_type = 'deposit' if amount > 0 else 'withdrawal'
             trans_description = f"Поповнення картки {card_name}" if amount > 0 else f"Зняття з картки {card_name}"
@@ -722,27 +672,23 @@ def update_card_balance(cursor, conn, card_id, amount, description=""):
         
         return True
     except Exception as e:
-        print(f"Error updating card balance: {e}")
         return False
 
 def delete_user_card(cursor, conn, card_id):
     """Delete user card from database."""
     try:
-        # Отримуємо інформацію про картку перед видаленням
         cursor.execute("SELECT user_id, name FROM user_cards WHERE id=?", (card_id,))
         card_info = cursor.fetchone()
         
         cursor.execute("DELETE FROM user_cards WHERE id=?", (card_id,))
         conn.commit()
         
-        # Логуємо видалення картки
         if card_info:
             user_id, card_name = card_info
             log_transaction(cursor, conn, user_id, 'card_deletion', 0, f"Видалено картку {card_name}", card_id)
         
         return True
     except Exception as e:
-        print(f"Error deleting user card: {e}")
         return False
 
 def update_user_card(cursor, conn, card_id, name=None, number=None, bank=None, balance=None, color=None):
@@ -779,13 +725,11 @@ def update_user_card(cursor, conn, card_id, name=None, number=None, bank=None, b
         conn.commit()
         return True
     except Exception as e:
-        print(f"Error updating user card: {e}")
         return False
 
 def transfer_money_between_cards(cursor, conn, from_card_id, to_card_id, amount):
     """Transfer money between cards."""
     try:
-        # Перевіряємо баланс відправника
         cursor.execute("SELECT balance, user_id, name FROM user_cards WHERE id=?", (from_card_id,))
         from_result = cursor.fetchone()
         if not from_result:
@@ -793,7 +737,6 @@ def transfer_money_between_cards(cursor, conn, from_card_id, to_card_id, amount)
         
         from_balance, from_user_id, from_card_name = from_result
         
-        # Перевіряємо чи існує картка отримувача
         cursor.execute("SELECT user_id, name FROM user_cards WHERE id=?", (to_card_id,))
         to_result = cursor.fetchone()
         if not to_result:
@@ -804,7 +747,6 @@ def transfer_money_between_cards(cursor, conn, from_card_id, to_card_id, amount)
         if from_balance < amount:
             return False, "Недостатньо коштів на картці"
         
-        # Оновлюємо баланси
         new_from_balance = from_balance - amount
         cursor.execute("UPDATE user_cards SET balance=? WHERE id=?", (new_from_balance, from_card_id))
         
@@ -814,23 +756,19 @@ def transfer_money_between_cards(cursor, conn, from_card_id, to_card_id, amount)
         
         conn.commit()
         
-        # Логуємо переказ
         log_transaction(cursor, conn, from_user_id, 'transfer_out', -amount, f"Переказ на картку {to_card_name}", from_card_id)
         log_transaction(cursor, conn, to_user_id, 'transfer_in', amount, f"Переказ з картки {from_card_name}", to_card_id)
         
         return True, "Переказ успішний"
     except Exception as e:
-        print(f"Error transferring money: {e}")
         return False, "Помилка переказу"
 
 def log_transaction(cursor, conn, user_id, transaction_type, amount, description="", card_id=None):
     """Логування транзакції з уникненням дублювання"""
     try:
-        # НЕ логуємо створення карток
         if transaction_type == 'card_creation':
             return True
             
-        # Перевіряємо, чи не було вже схожої транзакції нещодавно
         cursor.execute('''
             SELECT COUNT(*) FROM transactions 
             WHERE user_id=? AND type=? AND amount=? AND description=? 
@@ -840,21 +778,17 @@ def log_transaction(cursor, conn, user_id, transaction_type, amount, description
         recent_count = cursor.fetchone()[0]
         
         if recent_count > 0:
-            print(f"=== УВАГА: Знайдено {recent_count} схожих транзакцій за останню хвилину, пропускаємо ===")
             return True
             
-        # Додаємо транзакцію
         cursor.execute('''
             INSERT INTO transactions (user_id, type, amount, description, card_id, created_at)
             VALUES (?, ?, ?, ?, ?, datetime('now'))
         ''', (user_id, transaction_type, amount, description, card_id))
         
         conn.commit()
-        print(f"=== ТРАНЗАКЦІЮ УСПІШНО ЗАЛОГОВАНО === user_id: {user_id}, type: {transaction_type}, amount: {amount}")
         return True
         
     except Exception as e:
-        print(f"Помилка логування транзакції: {e}")
         return False
     
 def update_envelope(cursor, conn, envelope_id, name=None, budget_limit=None):
@@ -880,7 +814,6 @@ def update_envelope(cursor, conn, envelope_id, name=None, budget_limit=None):
         conn.commit()
         return True
     except Exception as e:
-        print(f"Error updating envelope: {e}")
         return False
     
 def get_user_transactions(cursor, user_id, limit=50):
@@ -910,7 +843,6 @@ def get_user_transactions(cursor, user_id, limit=50):
         
         return result
     except Exception as e:
-        print(f"Error getting transactions: {e}")
         return []
 
 def log_savings_transaction(cursor, conn, user_id, plan_id, amount, trans_type, description=""):
@@ -922,7 +854,7 @@ def log_savings_transaction(cursor, conn, user_id, plan_id, amount, trans_type, 
         )
         conn.commit()
     except Exception as e:
-        print(f"Error logging savings transaction: {e}")
+        pass
 
 def create_envelope(cursor, conn, user_id, name, color=None, budget_limit=0.0):
     """Create a new envelope for user."""
@@ -939,7 +871,6 @@ def create_envelope(cursor, conn, user_id, name, color=None, budget_limit=0.0):
         conn.commit()
         return cursor.lastrowid
     except Exception as e:
-        print(f"Error creating envelope: {e}")
         return None
 
 def get_user_envelopes(cursor, user_id):
@@ -965,25 +896,21 @@ def get_user_envelopes(cursor, user_id):
         
         return result
     except Exception as e:
-        print(f"Error getting user envelopes: {e}")
         return []
 
 def add_to_envelope(cursor, conn, user_id, envelope_id, amount, description="", card_id=None):
     """Add money to envelope."""
     try:
-        # Оновлюємо баланс конверту
         cursor.execute(
             "UPDATE envelopes SET current_amount = current_amount + ? WHERE id=?",
             (amount, envelope_id)
         )
         
-        # Логуємо транзакцію
         cursor.execute(
             "INSERT INTO envelope_transactions (user_id, envelope_id, amount, description, card_id) VALUES (?, ?, ?, ?, ?)",
             (user_id, envelope_id, amount, description, card_id)
         )
         
-        # Логуємо в основні транзакції
         envelope_name = get_envelope_name(cursor, envelope_id)
         log_transaction(cursor, conn, user_id, 'envelope_deposit', amount, 
                        f"{description} ({envelope_name})", card_id)
@@ -991,7 +918,6 @@ def add_to_envelope(cursor, conn, user_id, envelope_id, amount, description="", 
         conn.commit()
         return True
     except Exception as e:
-        print(f"Error adding to envelope: {e}")
         return False
 
 def get_envelope_name(cursor, envelope_id):
@@ -1038,7 +964,6 @@ def get_envelope_transactions(cursor, user_id, envelope_id=None, limit=50):
         
         return result
     except Exception as e:
-        print(f"Error getting envelope transactions: {e}")
         return []
 
 def get_envelope_stats(cursor, user_id):
@@ -1073,34 +998,23 @@ def get_envelope_stats(cursor, user_id):
         
         return result
     except Exception as e:
-        print(f"Error getting envelope stats: {e}")
         return []
 
 def debug_transactions(cursor, user_id):
     """Функція для відладки транзакцій"""
     try:
-        print(f"=== ДЕБАГ: Пошук транзакцій для user_id={user_id} ===")
-        
-        # Перевіряємо всі транзакції користувача
         cursor.execute(
             "SELECT type, amount, description, created_at FROM transactions WHERE user_id=? ORDER BY created_at DESC LIMIT 10",
             (user_id,)
         )
         transactions = cursor.fetchall()
-        
-        print(f"=== ДЕБАГ: Знайдено {len(transactions)} транзакцій ===")
-        for i, trans in enumerate(transactions):
-            print(f"Транзакція {i}: {trans}")
-            
         return transactions
     except Exception as e:
-        print(f"=== ДЕБАГ: Помилка: {e} ===")
         return []
 
 # Initialize and export connection objects
 conn, cursor = init_database()
 
-# Викликаємо функцію виправлення після ініціалізації
 fix_database_schema(conn, cursor)
 
 os.environ['KIVY_NO_MTDEV'] = '1'
@@ -1117,5 +1031,6 @@ __all__ = [
     'create_user', 'get_user_by_email',
     # Analytics functions
     'get_analytics_data', 'get_category_breakdown', 'get_top_categories', 
-    'get_cards_analytics', 'get_budget_progress', 'get_insights_and_forecasts', 'get_monthly_comparison'
+    'get_cards_analytics', 'get_budget_progress', 'get_insights_and_forecasts', 'get_monthly_comparison',
+    'debug_transactions'
 ]

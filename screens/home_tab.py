@@ -13,13 +13,31 @@ from kivy.app import App
 from kivy.clock import Clock
 from kivy.properties import StringProperty, ObjectProperty
 from kivy.graphics import Line, Rectangle, Color, RoundedRectangle
-import hashlib
 import base64
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+import traceback
 
-from db_manager import cursor, conn, log_transaction
+try:
+    from db_manager import cursor, conn, log_transaction, get_user_cards, debug_transactions, get_total_balance, update_card_balance, create_user_card, update_user_card, delete_user_card, transfer_money_between_cards
+except ImportError:
+    class MockCursor:
+        def execute(self, *args): pass
+        def fetchall(self): return []
+    cursor = MockCursor()
+    class MockConn:
+        def commit(self): pass
+    conn = MockConn()
+    def log_transaction(*args): pass
+    def get_user_cards(*args): return []
+    def debug_transactions(*args): return []
+    def get_total_balance(*args): return 0.0
+    def update_card_balance(*args): return True
+    def create_user_card(*args): return 1
+    def update_user_card(*args): return True
+    def delete_user_card(*args): return True
+    def transfer_money_between_cards(*args): return True, ""
 
 # Кольорова палітра
 PRIMARY_PINK = (0.95, 0.3, 0.5, 1)
@@ -36,13 +54,11 @@ DARK_GRAY = (0.4, 0.4, 0.4, 1)
 # Шифрування для номерів карток
 class CardEncryption:
     def __init__(self):
-        # Використовуємо фіксований ключ для простоти (в продакшені має бути безпечне зберігання)
         self.password = b"flamingo_card_encryption_key_2024"
         self.salt = b"flamingo_salt_2024"
         self._setup_encryption()
     
     def _setup_encryption(self):
-        """Налаштування шифрування"""
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
@@ -53,38 +69,62 @@ class CardEncryption:
         self.cipher_suite = Fernet(key)
     
     def encrypt_card_number(self, card_number):
-        """Шифрування номера картки"""
         if not card_number:
             return None
-        encrypted = self.cipher_suite.encrypt(card_number.encode())
-        return encrypted.decode()
+        try:
+            encrypted = self.cipher_suite.encrypt(card_number.encode('utf-8'))
+            return encrypted.decode('utf-8')
+        except Exception as e:
+            return None
     
     def decrypt_card_number(self, encrypted_card):
-        """Розшифрування номера картки"""
         if not encrypted_card:
             return None
         try:
-            decrypted = self.cipher_suite.decrypt(encrypted_card.encode())
-            return decrypted.decode()
-        except:
+            decrypted = self.cipher_suite.decrypt(encrypted_card.encode('utf-8'))
+            return decrypted.decode('utf-8')
+        except Exception as e:
+            # Якщо не вдається розшифрувати, повертаємо None
             return None
-    
-    def mask_card_number(self, card_number):
-        """Маскування номера картки (показує тільки останні 4 цифри)"""
-        if not card_number:
-            return "**** **** **** ****"
-        
-        # Видаляємо всі пробіли
-        clean_number = card_number.replace(" ", "")
-        
-        if len(clean_number) < 4:
-            return "**** **** **** ****"
-        
-        # Повертаємо маскований номер з останніми 4 цифрами
-        return f"**** **** **** {clean_number[-4:]}"
 
 # Глобальний екземпляр шифрувальника
 card_encryptor = CardEncryption()
+
+def fix_existing_cards():
+    try:
+        # Припускаємо, що таблиця називається 'user_cards' (як у db_manager)
+        cursor.execute("SELECT id, number FROM user_cards")
+        cards = cursor.fetchall()
+        
+        for card_id, card_number in cards:
+            if not card_number:
+                continue
+
+            is_encrypted = False
+            decrypted_value = card_encryptor.decrypt_card_number(card_number)
+
+            # Перевіряємо, чи розшифрований формат схожий на "XXXX XXXX XXXX XXXX"
+            if decrypted_value and decrypted_value.count(' ') == 3 and len(decrypted_value) == 19:
+                is_encrypted = True
+            
+            if not is_encrypted:
+                clean_number = card_number.replace(" ", "").strip()
+                if len(clean_number) == 16 and clean_number.isdigit():
+                    formatted_number = f"{clean_number[:4]} {clean_number[4:8]} {clean_number[8:12]} {clean_number[12:16]}"
+                    encrypted_number = card_encryptor.encrypt_card_number(formatted_number)
+                    
+                    if encrypted_number:
+                        cursor.execute("UPDATE user_cards SET number = ? WHERE id = ?", 
+                                     (encrypted_number, card_id))
+        
+        conn.commit()
+    except Exception as e:
+        pass
+
+try:
+    fix_existing_cards()
+except Exception as e:
+    pass
 
 class ModernBankCard(BoxLayout):
     def __init__(self, card_data, **kwargs):
@@ -96,9 +136,7 @@ class ModernBankCard(BoxLayout):
         self.padding = dp(35)
         self.spacing = dp(12)
         
-        # Додаємо сучасний фон картки з градієнтом
         with self.canvas.before:
-            # Основний фон (темніший для кращого контрасту)
             Color(*self.get_darker_color(card_data['color']))
             self.bg_rect = RoundedRectangle(
                 pos=self.pos,
@@ -106,7 +144,6 @@ class ModernBankCard(BoxLayout):
                 radius=[dp(25)]
             )
             
-            # Градієнтний ефект
             Color(1, 1, 1, 0.1)
             RoundedRectangle(
                 pos=(self.x, self.y + self.height * 0.6),
@@ -114,7 +151,6 @@ class ModernBankCard(BoxLayout):
                 radius=[dp(25)]
             )
             
-            # Біла рамка
             Color(1, 1, 1, 0.4)
             self.border = Line(
                 rounded_rectangle=(self.x, self.y, self.width, self.height, dp(25)),
@@ -123,7 +159,6 @@ class ModernBankCard(BoxLayout):
         
         self.bind(pos=self.update_graphics, size=self.update_graphics)
         
-        # Верхній ряд - банк
         header_layout = BoxLayout(
             size_hint_y=None,
             height=dp(30),
@@ -142,15 +177,14 @@ class ModernBankCard(BoxLayout):
         header_layout.add_widget(bank_label)
         self.add_widget(header_layout)
         
-        # Номер картки (стилізований) - ВИКОРИСТОВУЄМО МАСКОВАНИЙ НОМЕР
         number_layout = BoxLayout(
             size_hint_y=None,
             height=dp(40),
             orientation='vertical'
         )
         
-        # Отримуємо маскований номер картки
-        masked_number = card_data.get('masked_number', '**** **** **** ****')
+        # ВИПРАВЛЕНО: Використовуємо коректно обчислений masked_number з load_user_cards
+        masked_number = card_data.get('masked_number', '**** **** **** ****') 
         
         number_label = Label(
             text=masked_number,
@@ -160,7 +194,6 @@ class ModernBankCard(BoxLayout):
         number_layout.add_widget(number_label)
         self.add_widget(number_layout)
         
-        # Ім'я картки
         name_label = Label(
             text=card_data['name'].upper(),
             font_size=dp(14),
@@ -170,7 +203,6 @@ class ModernBankCard(BoxLayout):
         name_label.bind(size=name_label.setter('text_size'))
         self.add_widget(name_label)
         
-        # Баланс (виділений)
         balance_layout = BoxLayout(
             size_hint_y=None,
             height=dp(50)
@@ -186,11 +218,10 @@ class ModernBankCard(BoxLayout):
         balance_label.bind(size=balance_label.setter('text_size'))
         
         balance_layout.add_widget(balance_label)
-        balance_layout.add_widget(Label())  # Пустий простір
+        balance_layout.add_widget(Label())
         self.add_widget(balance_layout)
 
     def get_darker_color(self, color):
-        """Робить колір темнішим для кращого контрасту"""
         r, g, b, a = color
         return [max(0, r * 0.7), max(0, g * 0.7), max(0, b * 0.7), a]
 
@@ -200,62 +231,53 @@ class ModernBankCard(BoxLayout):
         self.border.rounded_rectangle = (self.x, self.y, self.width, self.height, dp(25))
 
 class WhitePopup(Popup):
-    """Базовий клас білого попапу з темним текстом"""
     
     def __init__(self, **kwargs):
-        # Видаляємо всі параметри фону, щоб уникнути конфліктів
-        kwargs.pop('background', '')
+        kwargs.pop('background', None)
         kwargs.pop('background_color', None)
         kwargs.pop('background_normal', None)
         kwargs.pop('background_down', None)
         
         super().__init__(**kwargs)
         
-        # Робимо фон повністю прозорим
         self.background = ''
         self.background_color = [1, 1, 1, 0]
         self.separator_height = 0
         self.auto_dismiss = False
         
-        # Створюємо білий фон через canvas
         with self.canvas.before:
             Color(*WHITE)
-            self.bg_rect = Rectangle(pos=self.pos, size=self.size)
+            self.bg_rect = RoundedRectangle(pos=self.pos, size=self.size, radius=[dp(10)])
             
-            # Додаємо темну рамку
             Color(*DARK_GRAY)
             self.border_line = Line(
-                rectangle=(self.x, self.y, self.width, self.height),
+                rounded_rectangle=(self.x, self.y, self.width, self.height, dp(10)),
                 width=1.2
             )
         
-        # Прив'язуємо оновлення позиції та розміру
         self.bind(pos=self._update_graphics, size=self._update_graphics)
     
     def _update_graphics(self, *args):
-        """Оновлюємо графічні елементи при зміні позиції чи розміру"""
         self.bg_rect.pos = self.pos
         self.bg_rect.size = self.size
-        self.border_line.rectangle = (self.x, self.y, self.width, self.height)
+        self.border_line.rounded_rectangle = (self.x, self.y, self.width, self.height, dp(10))
 
 class WhiteButton(Button):
-    """Стилізована кнопка для білих попапів"""
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.background_normal = ''
         self.background_down = ''
-        self.background_color = PRIMARY_BLUE
+        self.background_color = kwargs.get('background_color', PRIMARY_BLUE)
         self.color = WHITE
         self.font_size = dp(16)
         self.size_hint_y = None
         self.height = dp(45)
         self.bold = True
         
-        # Додаємо фон через canvas
         with self.canvas.before:
             Color(*self.background_color)
-            self.rect = Rectangle(pos=self.pos, size=self.size)
+            self.rect = RoundedRectangle(pos=self.pos, size=self.size, radius=[dp(8)])
         
         self.bind(pos=self._update_rect, size=self._update_rect)
         self.bind(background_color=self._update_color)
@@ -268,10 +290,9 @@ class WhiteButton(Button):
         self.canvas.before.clear()
         with self.canvas.before:
             Color(*value)
-            self.rect = Rectangle(pos=self.pos, size=self.size)
+            self.rect = RoundedRectangle(pos=self.pos, size=self.size, radius=[dp(8)])
 
 class WhiteTextInput(TextInput):
-    """Стилізоване текстове поле для білих попапів"""
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -285,24 +306,22 @@ class WhiteTextInput(TextInput):
         self.size_hint_y = None
         self.height = dp(48)
         self.cursor_color = PRIMARY_BLUE
-        self.hint_text_color = LIGHT_GRAY
+        self.hint_text_color = DARK_GRAY
         self.write_tab = False
         
-        # Додаємо рамку
         with self.canvas.after:
             Color(*DARK_GRAY)
             self.border_line = Line(
-                rectangle=(self.x, self.y, self.width, self.height),
+                rounded_rectangle=(self.x, self.y, self.width, self.height, dp(5)),
                 width=1
             )
         
         self.bind(pos=self._update_border, size=self._update_border)
     
     def _update_border(self, *args):
-        self.border_line.rectangle = (self.x, self.y, self.width, self.height)
+        self.border_line.rounded_rectangle = (self.x, self.y, self.width, self.height, dp(5))
 
 class HomeTab(Screen):
-    """Головний таб з балансом та транзакціями"""
     
     current_filter = StringProperty("Всі банки")
     
@@ -329,19 +348,13 @@ class HomeTab(Screen):
         self._update_scheduled = False
     
     def update_content(self):
-        """Оновлення вмісту головного табу"""
-        print("Оновлення головного екрану...")
-        
         app = self.get_app()
         
         if hasattr(app, 'current_user') and app.current_user:
-            print(f"Користувач: {app.current_user}")
-            
             if 'welcome_label' in self.ids:
                 self.ids.welcome_label.text = f"Вітаємо, {app.current_user}!"
             
             try:
-                from db_manager import get_total_balance
                 cards_balance = get_total_balance(cursor, app.current_user_id)
                 
                 if 'balance_label' in self.ids:
@@ -351,54 +364,80 @@ class HomeTab(Screen):
                 self.update_transactions_history()
                     
             except Exception as e:
-                print(f"Помилка оновлення балансу: {e}")
                 if 'balance_label' in self.ids:
                     self.ids.balance_label.text = "Помилка завантаження"
         else:
-            print("Користувача не знайдено")
             if 'welcome_label' in self.ids:
                 self.ids.welcome_label.text = "Вітаємо!"
             if 'balance_label' in self.ids:
                 self.ids.balance_label.text = "Загальний баланс: 0.00 $"
     
     def load_user_cards(self):
-        """Завантаження карток користувача з шифрованими номерами"""
+        """
+        Виправлено: Розшифровує зашифрований номер з db_manager та коректно маскує.
+        """
         try:
             app = self.get_app()
-            from db_manager import get_user_cards
             
-            print("Завантаження карток...")
             raw_cards_data = get_user_cards(cursor, app.current_user_id)
             
-            # Обробляємо дані карток - додаємо масковані номери
             self.cards_data = []
             for card in raw_cards_data:
-                # Створюємо копію картки з маскованим номером
                 processed_card = card.copy()
                 
-                # Додаємо маскований номер для відображення
-                processed_card['masked_number'] = card_encryptor.mask_card_number(card.get('number', ''))
+                encrypted_number = card.get('number', '')
                 
-                # Прибираємо повний номер з даних для безпеки
-                if 'number' in processed_card:
-                    del processed_card['number']
-                if 'full_number' in processed_card:
-                    del processed_card['full_number']
+                # Крок 1: Розшифрування номера
+                decrypted_number = card_encryptor.decrypt_card_number(encrypted_number)
+                
+                if decrypted_number:
+                    # Крок 2: Очищення та маскування
+                    clean_number = decrypted_number.replace(" ", "")
+                    if len(clean_number) >= 4 and clean_number.isdigit():
+                        last_four = clean_number[-4:]
+                        processed_card['masked_number'] = f"**** **** **** {last_four}"
+                    else:
+                        processed_card['masked_number'] = "**** **** **** ****"
+                    
+                    processed_card['decrypted_number'] = decrypted_number # Форматований розшифрований (XXXX XXXX...)
+                else:
+                    processed_card['masked_number'] = "**** **** **** ****"
+                    processed_card['decrypted_number'] = None
+                
+                # Зберігаємо зашифрований номер на випадок, якщо він потрібен в іншому місці
+                processed_card['number'] = encrypted_number 
                 
                 self.cards_data.append(processed_card)
-            
-            print(f"Завантажено {len(self.cards_data)} карток")
             
             self.update_bank_list()
             self.apply_bank_filter()
         
         except Exception as e:
-            print(f"Помилка завантаження карток: {e}")
-            import traceback
-            traceback.print_exc()
+            pass
+    
+    def check_card_exists(self, card_number, current_card_id=None):
+        try:
+            app = self.get_app()
+            
+            user_cards_data = get_user_cards(cursor, app.current_user_id)
+            
+            clean_new_number = card_number.replace(" ", "")
+            
+            for card in user_cards_data:
+                encrypted_number = card.get('number', '')
+                decrypted_existing = card_encryptor.decrypt_card_number(encrypted_number)
+                
+                if decrypted_existing:
+                    clean_existing_number = decrypted_existing.replace(" ", "")
+                    if clean_existing_number == clean_new_number:
+                        if current_card_id is None or card.get('id') != current_card_id:
+                            return True
+            
+            return False
+        except Exception as e:
+            return False
     
     def update_bank_list(self):
-        """Оновлення списку банків"""
         banks = set(["Всі банки"])
         
         for card in self.cards_data:
@@ -415,26 +454,19 @@ class HomeTab(Screen):
                 self.current_filter = "Всі банки"
     
     def apply_bank_filter(self):
-        """Застосування фільтра банків"""
-        print(f"Застосовуємо фільтр: {self.current_filter}")
         filtered_cards = self.cards_data
         
         if self.current_filter != "Всі банки":
             filtered_cards = [card for card in self.cards_data if card['bank'] == self.current_filter]
         
-        print(f"Відфільтровано до {len(filtered_cards)} карток")
         self.create_cards_carousel(filtered_cards)
     
     def change_bank_filter(self, bank_name):
-        """Зміна фільтра банку"""
-        print(f"Зміна фільтра на: {bank_name}")
         self.current_filter = bank_name
         self.apply_bank_filter()
     
     def create_cards_carousel(self, cards_data=None):
-        """Створення каруселі з картками"""
         if 'cards_container' not in self.ids:
-            print("cards_container не знайдено")
             return
             
         if cards_data is None:
@@ -453,17 +485,13 @@ class HomeTab(Screen):
             card_widget = self.create_card_with_actions(card_data)
             carousel.add_widget(card_widget)
         
-        # Додаємо кнопку "+" для створення нової картки
         if len(cards_data) < 10:
             add_card_button = self.create_add_card_button()
             carousel.add_widget(add_card_button)
         
         cards_container.add_widget(carousel)
-        
-        print(f"Створено карусель з {len(carousel.slides)} слайдами")
     
     def create_card_with_actions(self, card_data):
-        """Створення картки з кнопками дій"""
         main_layout = BoxLayout(
             orientation='vertical',
             size_hint=(0.9, 0.9),
@@ -471,19 +499,16 @@ class HomeTab(Screen):
             padding=dp(10)
         )
         
-        # Картка
         card = ModernBankCard(card_data)
         main_layout.add_widget(card)
         
-        # Кнопки дій
         actions_layout = BoxLayout(
             size_hint_y=None,
             height=dp(50),
             spacing=dp(10)
         )
         
-        # Кнопка поповнення
-        topup_btn = Button(
+        topup_btn = WhiteButton(
             text='Поповнити',
             size_hint_x=0.5,
             background_color=SUCCESS_GREEN,
@@ -492,8 +517,7 @@ class HomeTab(Screen):
         )
         topup_btn.bind(on_press=lambda x: self.show_deposit_modal(card_data))
         
-        # Кнопка керування
-        manage_btn = Button(
+        manage_btn = WhiteButton(
             text='Керувати',
             size_hint_x=0.5,
             background_color=PRIMARY_BLUE,
@@ -509,7 +533,6 @@ class HomeTab(Screen):
         return main_layout
     
     def create_add_card_button(self):
-        """Створення кнопки додавання картки"""
         add_card_button = Button(
             text="+",
             font_size=dp(50),
@@ -540,7 +563,6 @@ class HomeTab(Screen):
         return add_card_button
     
     def _update_add_button_graphics(self, instance, value):
-        """Оновлення графіки кнопки додавання"""
         instance.canvas.before.clear()
         with instance.canvas.before:
             Color(0.4, 0.4, 0.4, 0.3)
@@ -559,10 +581,8 @@ class HomeTab(Screen):
             )
     
     def show_create_card_modal(self, instance=None):
-        """Показати модальне вікно створення картки"""
         content = BoxLayout(orientation='vertical', spacing=dp(20), padding=dp(25))
         
-        # Додаємо білий фон для контенту
         with content.canvas.before:
             Color(*WHITE)
             self.content_rect = Rectangle(pos=content.pos, size=content.size)
@@ -575,8 +595,11 @@ class HomeTab(Screen):
             bold=True,
             color=DARK_TEXT,
             size_hint_y=None,
-            height=dp(50)
+            height=dp(50),
+            halign='left',
+            valign='middle'
         )
+        title.bind(size=title.setter('text_size'))
         content.add_widget(title)
         
         name_input = WhiteTextInput(
@@ -600,7 +623,9 @@ class HomeTab(Screen):
             size_hint_y=None,
             height=dp(55),
             color=DARK_TEXT,
-            background_color=WHITE
+            background_color=WHITE,
+            halign='left',
+            text_size=(dp(200), dp(55))
         )
         content.add_widget(bank_spinner)
         
@@ -631,8 +656,12 @@ class HomeTab(Screen):
                 error_label.text = "Введіть назву картки"
                 return
                 
-            if not card_number or len(card_number) != 16 or not card_number.isdigit():
+            if len(card_number) != 16:
                 error_label.text = "Введіть коректний номер картки (16 цифр)"
+                return
+            
+            if self.check_card_exists(card_number):
+                error_label.text = "Картка з таким номером вже існує"
                 return
             
             success = self.create_card_from_modal(card_name, card_number, bank_name)
@@ -649,22 +678,18 @@ class HomeTab(Screen):
         content.add_widget(buttons_layout)
         
         popup = WhitePopup(
-            title='Створення картки',
+            title='',
             content=content,
             size_hint=(0.85, 0.7)
         )
         popup.open()
     
     def _update_content_rect(self, instance, value):
-        """Оновлюємо фон контенту для попапів"""
         self.content_rect.pos = instance.pos
         self.content_rect.size = instance.size
     
     def create_card_from_modal(self, card_name, card_number, bank_name):
-        """Створення нової картки з модального вікна"""
         try:
-            print(f"Створення картки: {card_name}, {card_number}, {bank_name}")
-            
             formatted_number = f"{card_number[:4]} {card_number[4:8]} {card_number[8:12]} {card_number[12:16]}"
             app = self.get_app()
             
@@ -679,22 +704,23 @@ class HomeTab(Screen):
             
             color = bank_colors.get(bank_name, [0.2, 0.4, 0.8, 1])
             
-            # ШИФРУЄМО НОМЕР КАРТКИ ПЕРЕД ЗБЕРЕЖЕННЯМ
             encrypted_number = card_encryptor.encrypt_card_number(formatted_number)
             
-            from db_manager import create_user_card
+            if not encrypted_number:
+                self.show_error_message("Помилка шифрування номера картки")
+                return False
+            
             card_id = create_user_card(
                 cursor, conn, 
                 app.current_user_id, 
                 card_name, 
-                encrypted_number,  # Використовуємо зашифрований номер
+                encrypted_number,
                 bank_name,
                 0.0,
                 color
             )
             
             if card_id:
-                print(f"Картка успішно створена з ID: {card_id}")
                 self.load_user_cards()
                 self.show_success_message(f"Картка '{card_name}' успішно створена!")
                 return True
@@ -703,15 +729,12 @@ class HomeTab(Screen):
                 return False
                 
         except Exception as e:
-            print(f"Помилка створення картки: {e}")
             self.show_error_message("Сталася помилка")
             return False
 
     def show_card_management_modal(self, card_data):
-        """Показати модальне вікно керування карткою"""
         content = BoxLayout(orientation='vertical', spacing=dp(15), padding=dp(20))
         
-        # Додаємо білий фон для контенту
         with content.canvas.before:
             Color(*WHITE)
             self.content_rect = Rectangle(pos=content.pos, size=content.size)
@@ -739,19 +762,16 @@ class HomeTab(Screen):
         
         buttons_layout = BoxLayout(orientation='vertical', spacing=dp(10), size_hint_y=0.7)
         
-        # ЛИШЕ 3 КНОПКИ: Редагувати, Переказати, Видалити
         edit_btn = WhiteButton(text="Редагувати картку")
         edit_btn.background_color = PRIMARY_BLUE
         edit_btn.bind(on_press=lambda x: (self.current_popup.dismiss(), self.show_edit_card_modal(card_data)))
         buttons_layout.add_widget(edit_btn)
         
-        # КНОПКА: Переказати гроші
         transfer_btn = WhiteButton(text="Переказати гроші")
         transfer_btn.background_color = (0.8, 0.6, 0.2, 1)
         transfer_btn.bind(on_press=lambda x: (self.current_popup.dismiss(), self.show_transfer_modal(card_data)))
         buttons_layout.add_widget(transfer_btn)
         
-        # КНОПКА: Видалити картку
         delete_btn = WhiteButton(text="Видалити картку")
         delete_btn.background_color = ERROR_RED
         delete_btn.bind(on_press=lambda x: (self.current_popup.dismiss(), self.show_delete_confirmation(card_data)))
@@ -766,17 +786,15 @@ class HomeTab(Screen):
         content.add_widget(close_btn)
         
         self.current_popup = WhitePopup(
-            title='Керування карткою',
+            title='',
             content=content,
             size_hint=(0.7, 0.45)
         )
         self.current_popup.open()
 
     def show_deposit_modal(self, card_data):
-        """Показати модальне вікно поповнення картки"""
         content = BoxLayout(orientation='vertical', spacing=dp(15), padding=dp(20))
         
-        # Додаємо білий фон для контенту
         with content.canvas.before:
             Color(*WHITE)
             self.content_rect = Rectangle(pos=content.pos, size=content.size)
@@ -831,8 +849,6 @@ class HomeTab(Screen):
                     error_label.text = "Сума має бути додатною"
                     return
                 
-                # Поповнюємо картку
-                from db_manager import update_card_balance
                 success = update_card_balance(cursor, conn, card_data['id'], amount)
                 
                 if success:
@@ -840,7 +856,6 @@ class HomeTab(Screen):
                     self.load_user_cards()
                     self.update_content()
                     
-                    # ЛОГУЄМО ТРАНЗАКЦІЮ - тільки один раз!
                     log_transaction(cursor, conn, self.get_app().current_user_id, 
                                 "deposit", amount, f"Поповнення картки {card_data['name']}")
                     
@@ -860,17 +875,15 @@ class HomeTab(Screen):
         content.add_widget(buttons_layout)
         
         self.current_popup = WhitePopup(
-            title='Поповнення картки',
+            title='',
             content=content,
             size_hint=(0.7, 0.4)
         )
         self.current_popup.open()
 
     def show_edit_card_modal(self, card_data):
-        """Показати модальне вікно редагування картки"""
         content = BoxLayout(orientation='vertical', spacing=dp(15), padding=dp(20))
         
-        # Додаємо білий фон для контенту
         with content.canvas.before:
             Color(*WHITE)
             self.content_rect = Rectangle(pos=content.pos, size=content.size)
@@ -887,6 +900,8 @@ class HomeTab(Screen):
         )
         content.add_widget(title)
         
+        decrypted_number = card_data.get('decrypted_number', '')
+        
         name_input = WhiteTextInput(
             text=card_data['name'],
             hint_text="Назва картки",
@@ -896,7 +911,7 @@ class HomeTab(Screen):
         content.add_widget(name_input)
         
         number_input = WhiteTextInput(
-            text=card_data.get('number', '').replace(' ', ''),
+            text=decrypted_number.replace(' ', '') if decrypted_number else "",
             hint_text="Номер картки",
             input_filter='int',
             size_hint_y=None,
@@ -910,7 +925,9 @@ class HomeTab(Screen):
             size_hint_y=None,
             height=dp(45),
             color=DARK_TEXT,
-            background_color=WHITE
+            background_color=WHITE,
+            halign='left',
+            text_size=(dp(200), dp(45))
         )
         content.add_widget(bank_spinner)
         
@@ -945,13 +962,25 @@ class HomeTab(Screen):
                 error_label.text = "Введіть коректний номер картки (16 цифр)"
                 return
             
-            from db_manager import update_user_card
+            clean_original = decrypted_number.replace(" ", "") if decrypted_number else ""
+            if new_number != clean_original:
+                if self.check_card_exists(new_number, current_card_id=card_data['id']):
+                    error_label.text = "Картка з таким номером вже існує"
+                    return
+            
             formatted_number = f"{new_number[:4]} {new_number[4:8]} {new_number[8:12]} {new_number[12:16]}"
+            
+            encrypted_new_number = card_encryptor.encrypt_card_number(formatted_number)
+            
+            if not encrypted_new_number:
+                error_label.text = "Помилка шифрування номера картки"
+                return
+            
             success = update_user_card(
                 cursor, conn,
                 card_data['id'],
                 name=new_name,
-                number=formatted_number,
+                number=encrypted_new_number,
                 bank=new_bank
             )
             
@@ -969,17 +998,15 @@ class HomeTab(Screen):
         content.add_widget(buttons_layout)
         
         self.current_popup = WhitePopup(
-            title='Редагування картки',
+            title='',
             content=content,
             size_hint=(0.8, 0.6)
         )
         self.current_popup.open()
 
     def show_delete_confirmation(self, card_data):
-        """Показати підтвердження видалення картки"""
         content = BoxLayout(orientation='vertical', spacing=dp(15), padding=dp(20))
         
-        # Додаємо білий фон для контенту
         with content.canvas.before:
             Color(*WHITE)
             self.content_rect = Rectangle(pos=content.pos, size=content.size)
@@ -1015,7 +1042,6 @@ class HomeTab(Screen):
         delete_btn.background_color = ERROR_RED
         
         def delete_card(instance):
-            from db_manager import delete_user_card
             success = delete_user_card(cursor, conn, card_data['id'])
             if success:
                 self.current_popup.dismiss()
@@ -1032,17 +1058,15 @@ class HomeTab(Screen):
         content.add_widget(buttons_layout)
         
         self.current_popup = WhitePopup(
-            title='Підтвердження видалення',
+            title='',
             content=content,
             size_hint=(0.6, 0.3)
         )
         self.current_popup.open()
 
     def show_transfer_modal(self, from_card_data):
-        """Показати модальне вікно переказу коштів"""
         content = BoxLayout(orientation='vertical', spacing=dp(15), padding=dp(20))
         
-        # Додаємо білий фон для контенту
         with content.canvas.before:
             Color(*WHITE)
             self.content_rect = Rectangle(pos=content.pos, size=content.size)
@@ -1076,7 +1100,7 @@ class HomeTab(Screen):
             content.add_widget(close_btn)
             
             self.current_popup = WhitePopup(
-                title='Переказ коштів',
+                title='',
                 content=content,
                 size_hint=(0.7, 0.3)
             )
@@ -1089,7 +1113,9 @@ class HomeTab(Screen):
             size_hint_y=None,
             height=dp(45),
             color=DARK_TEXT,
-            background_color=WHITE
+            background_color=WHITE,
+            halign='left',
+            text_size=(dp(200), dp(45))
         )
         content.add_widget(to_card_spinner)
         
@@ -1129,7 +1155,12 @@ class HomeTab(Screen):
 
         def transfer_money(instance):
             try:
-                amount = float(amount_input.text.strip())
+                amount_text = amount_input.text.strip()
+                if not amount_text:
+                    error_label.text = "Введіть суму"
+                    return
+
+                amount = float(amount_text)
                 if amount <= 0:
                     error_label.text = "Сума має бути додатною"
                     return
@@ -1149,7 +1180,6 @@ class HomeTab(Screen):
                     error_label.text = "Картку отримувача не знайдено"
                     return
                 
-                from db_manager import transfer_money_between_cards
                 success, message = transfer_money_between_cards(
                     cursor, conn,
                     from_card_data['id'],
@@ -1179,16 +1209,14 @@ class HomeTab(Screen):
         content.add_widget(buttons_layout)
         
         self.current_popup = WhitePopup(
-            title='Переказ коштів',
+            title='',
             content=content,
             size_hint=(0.8, 0.6)
         )
         self.current_popup.open()
 
     def update_transactions_history(self):
-        """Оновлення історії транзакцій з покращеним дизайном"""
         if 'history_container' not in self.ids:
-            print("=== ПОМИЛКА: history_container не знайдено ===")
             return
 
         history_container = self.ids.history_container
@@ -1196,14 +1224,11 @@ class HomeTab(Screen):
         history_container.orientation = 'vertical'
         history_container.size_hint_y = None
         history_container.bind(minimum_height=history_container.setter('height'))
-        
-        print("=== ДЕБАГ: Очищено history_container ===")
 
         try:
             app = self.get_app()
             
             if not hasattr(app, 'current_user_id') or not app.current_user_id:
-                print("=== ПОМИЛКА: Немає current_user_id ===")
                 no_history_label = Label(
                     text="Увійдіть в систему",
                     font_size=dp(16),
@@ -1214,16 +1239,9 @@ class HomeTab(Screen):
                 history_container.add_widget(no_history_label)
                 return
             
-            print(f"=== ДЕБАГ: user_id = {app.current_user_id} ===")
-            
-            # ВИКОРИСТОВУЄМО ФУНКЦІЮ ДЛЯ ПЕРЕВІРКИ
-            from db_manager import debug_transactions
             transactions = debug_transactions(cursor, app.current_user_id)
-            
-            print(f"=== ДЕБАГ: Отримано {len(transactions)} транзакцій з бази ===")
 
             if not transactions:
-                print("=== ДЕБАГ: Немає транзакцій для відображення ===")
                 no_history_label = Label(
                     text="Ще немає транзакцій",
                     font_size=dp(16),
@@ -1234,110 +1252,70 @@ class HomeTab(Screen):
                 history_container.add_widget(no_history_label)
                 return
 
-            # Додаємо заголовок
             header_layout = BoxLayout(
                 size_hint_y=None,
                 height=dp(40),
                 padding=[dp(10), dp(5), dp(10), dp(5)]
             )
             
-            header_date = Label(
-                text="Дата",
-                size_hint_x=0.25,
-                color=DARK_GRAY,
-                font_size=dp(14),
-                bold=True
-            )
-            
-            header_desc = Label(
-                text="Опис",
-                size_hint_x=0.5,
-                color=DARK_GRAY,
-                font_size=dp(14),
-                bold=True
-            )
-            
-            header_amount = Label(
-                text="Сума",
-                size_hint_x=0.25,
-                color=DARK_GRAY,
-                font_size=dp(14),
-                bold=True
-            )
+            header_date = Label(text="Дата", size_hint_x=0.25, color=DARK_GRAY, font_size=dp(14), bold=True)
+            header_desc = Label(text="Опис", size_hint_x=0.5, color=DARK_GRAY, font_size=dp(14), bold=True)
+            header_amount = Label(text="Сума", size_hint_x=0.25, color=DARK_GRAY, font_size=dp(14), bold=True)
             
             header_layout.add_widget(header_date)
             header_layout.add_widget(header_desc)
             header_layout.add_widget(header_amount)
             history_container.add_widget(header_layout)
-            
-            print("=== ДЕБАГ: Додано заголовок ===")
 
-            # Фільтр для уникнення дублювання - зберігаємо унікальні транзакції
+            filtered_transactions = []
             seen_transactions = set()
-            unique_transactions = []
             
             for trans in transactions:
                 trans_type, amount, description, created_at = trans
                 
-                # ВИПРАВЛЕННЯ: Фільтруємо створення карток (card_creation)
                 if trans_type == 'card_creation':
-                    print("=== ДЕБАГ: Пропускаємо транзакцію створення картки ===")
                     continue
                 
-                # Створюємо унікальний ключ для транзакції
                 trans_key = (trans_type, amount, description, created_at)
                 
                 if trans_key not in seen_transactions:
                     seen_transactions.add(trans_key)
-                    unique_transactions.append(trans)
-            
-            print(f"=== ДЕБАГ: Після фільтрації залишилось {len(unique_transactions)} унікальних транзакцій ===")
+                    filtered_transactions.append(trans)
 
-            for i, (trans_type, amount, description, created_at) in enumerate(unique_transactions):
+            for i, (trans_type, amount, description, created_at) in enumerate(filtered_transactions):
                 try:
-                    print(f"=== ДЕБАГ: Обробка транзакції {i}: {trans_type} - {amount} - {description} ===")
-                    
-                    # Обробка дати
                     if isinstance(created_at, str):
                         try:
-                            if 'T' in created_at:  # Формат з T
+                            if 'T' in created_at:
                                 date_time = datetime.strptime(created_at.replace('T', ' ').split('.')[0], '%Y-%m-%d %H:%M:%S')
-                            elif '.' in created_at:  # Формат з мілісекундами
+                            elif '.' in created_at:
                                 date_time = datetime.strptime(created_at.split('.')[0], '%Y-%m-%d %H:%M:%S')
-                            else:  # Простий формат
+                            else:
                                 date_time = datetime.strptime(created_at, '%Y-%m-%d %H:%M:%S')
                         except ValueError as e:
-                            print(f"Помилка парсингу дати {created_at}: {e}")
                             date_time = datetime.now()
                     else:
                         date_time = created_at
                     
                     date_str = date_time.strftime('%d.%m %H:%M')
 
-                    # ВИПРАВЛЕНА ЛОГІКА КОЛЬОРІВ
                     if trans_type in ('deposit', 'savings_return', 'card_deposit', 'savings_interest', 'savings_completed', 'transfer_in', 'income'):
                         amount_color = SUCCESS_GREEN
                         sign = "+"
-                        print(f"=== ДЕБАГ: Транзакція {trans_type} - ЗЕЛЕНИЙ (+) ===")
                     elif trans_type in ('withdrawal', 'savings_deposit', 'transfer', 'transfer_out', 'savings_transfer', 'expense'):
                         amount_color = ERROR_RED
                         sign = "-"
-                        print(f"=== ДЕБАГ: Транзакція {trans_type} - ЧЕРВОНИЙ (-) ===")
                     else:
                         amount_color = DARK_GRAY
                         sign = ""
-                        print(f"=== ДЕБАГ: Транзакція {trans_type} - СІРИЙ ===")
 
-                    # Створюємо рядок транзакції
                     trans_layout = BoxLayout(
                         size_hint_y=None,
                         height=dp(55),
                         padding=[dp(10), dp(5), dp(10), dp(5)]
                     )
                     
-                    # Додаємо фон для рядка
                     with trans_layout.canvas.before:
-                        # Чергування кольорів фону для кращої читабельності
                         bg_color = (0.98, 0.98, 0.98, 1) if i % 2 == 0 else (0.95, 0.95, 0.95, 1)
                         Color(*bg_color)
                         trans_layout.bg_rect = Rectangle(
@@ -1345,7 +1323,6 @@ class HomeTab(Screen):
                             size=trans_layout.size
                         )
                     
-                    # Прив'язуємо оновлення фону
                     def update_bg_rect(instance, value):
                         instance.bg_rect.pos = instance.pos
                         instance.bg_rect.size = instance.size
@@ -1359,15 +1336,14 @@ class HomeTab(Screen):
                         font_size=dp(12)
                     )
                     
-                    # ВИПРАВЛЕННЯ: ВІДОБРАЖАЄМО ПОВНИЙ ОПИС БЕЗ ОБРІЗАННЯ
                     desc_label = Label(
-                        text=description,  # ВІДОБРАЖАЄМО ПОВНИЙ ТЕКСТ
+                        text=description,
                         size_hint_x=0.5,
                         color=DARK_TEXT,
                         font_size=dp(13),
-                        text_size=(None, None),
                         halign='left',
-                        valign='middle'
+                        valign='middle',
+                        text_size=(trans_layout.width * 0.5 - dp(20), None)
                     )
                     desc_label.bind(size=desc_label.setter('text_size'))
                     
@@ -1384,20 +1360,10 @@ class HomeTab(Screen):
                     trans_layout.add_widget(amount_label)
                     history_container.add_widget(trans_layout)
                     
-                    print(f"=== ДЕБАГ: Додано транзакцію до інтерфейсу ===")
-
                 except Exception as e:
-                    print(f"Помилка обробки транзакції {i}: {e}")
-                    import traceback
-                    traceback.print_exc()
                     continue
 
-            print(f"=== ДЕБАГ: Всього додано {len(history_container.children)} елементів до history_container ===")
-
         except Exception as e:
-            print(f"Помилка завантаження історії: {e}")
-            import traceback
-            traceback.print_exc()
             error_label = Label(
                 text="Помилка завантаження історії",
                 color=ERROR_RED,
@@ -1407,10 +1373,8 @@ class HomeTab(Screen):
             history_container.add_widget(error_label)
 
     def show_success_message(self, message):
-        """Показати повідомлення про успіх"""
         content = BoxLayout(orientation='vertical', spacing=dp(20), padding=dp(25))
         
-        # Додаємо білий фон для контенту
         with content.canvas.before:
             Color(*WHITE)
             self.content_rect = Rectangle(pos=content.pos, size=content.size)
@@ -1429,17 +1393,15 @@ class HomeTab(Screen):
         content.add_widget(ok_btn)
         
         popup = WhitePopup(
-            title='Успіх',
+            title='',
             content=content,
             size_hint=(0.6, 0.3)
         )
         popup.open()
 
     def show_error_message(self, message):
-        """Показати повідомлення про помилку"""
         content = BoxLayout(orientation='vertical', spacing=dp(20), padding=dp(25))
         
-        # Додаємо білий фон для контенту
         with content.canvas.before:
             Color(*WHITE)
             self.content_rect = Rectangle(pos=content.pos, size=content.size)
@@ -1458,7 +1420,7 @@ class HomeTab(Screen):
         content.add_widget(ok_btn)
         
         popup = WhitePopup(
-            title='Помилка',
+            title='',
             content=content,
             size_hint=(0.6, 0.3)
         )

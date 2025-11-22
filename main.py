@@ -38,11 +38,11 @@ class FinanceApp(App):
         dashboard = DashboardScreen(name="dashboard_screen")
         
         # Додаємо вкладки до tab_manager Dashboard з унікальними назвами
-        dashboard.ids.tab_manager.add_widget(HomeTab(name="home"))
-        dashboard.ids.tab_manager.add_widget(AnalyticsTab(name="analytics"))
-        dashboard.ids.tab_manager.add_widget(SavingsTab(name="savings"))
-        dashboard.ids.tab_manager.add_widget(AITab(name="ai"))
-        dashboard.ids.tab_manager.add_widget(AccountTab(name="account"))
+        dashboard.ids.tab_manager.add_widget(HomeTab(name="home_tab"))
+        dashboard.ids.tab_manager.add_widget(AnalyticsTab(name="analytics_tab"))
+        dashboard.ids.tab_manager.add_widget(SavingsTab(name="savings_tab"))
+        dashboard.ids.tab_manager.add_widget(AITab(name="ai_tab"))
+        dashboard.ids.tab_manager.add_widget(AccountTab(name="account_tab"))  # Змінено на account_tab
         
         sm.add_widget(dashboard)
         
