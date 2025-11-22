@@ -13,6 +13,11 @@ from kivy.app import App
 from kivy.clock import Clock
 from kivy.properties import StringProperty, ObjectProperty
 from kivy.graphics import Line, Rectangle, Color, RoundedRectangle
+import hashlib
+import base64
+from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 from db_manager import cursor, conn, log_transaction
 
@@ -27,6 +32,59 @@ WHITE = (1, 1, 1, 1)
 DARK_TEXT = (0.1, 0.1, 0.1, 1)
 LIGHT_GRAY = (0.9, 0.9, 0.9, 1)
 DARK_GRAY = (0.4, 0.4, 0.4, 1)
+
+# Шифрування для номерів карток
+class CardEncryption:
+    def __init__(self):
+        # Використовуємо фіксований ключ для простоти (в продакшені має бути безпечне зберігання)
+        self.password = b"flamingo_card_encryption_key_2024"
+        self.salt = b"flamingo_salt_2024"
+        self._setup_encryption()
+    
+    def _setup_encryption(self):
+        """Налаштування шифрування"""
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=self.salt,
+            iterations=100000,
+        )
+        key = base64.urlsafe_b64encode(kdf.derive(self.password))
+        self.cipher_suite = Fernet(key)
+    
+    def encrypt_card_number(self, card_number):
+        """Шифрування номера картки"""
+        if not card_number:
+            return None
+        encrypted = self.cipher_suite.encrypt(card_number.encode())
+        return encrypted.decode()
+    
+    def decrypt_card_number(self, encrypted_card):
+        """Розшифрування номера картки"""
+        if not encrypted_card:
+            return None
+        try:
+            decrypted = self.cipher_suite.decrypt(encrypted_card.encode())
+            return decrypted.decode()
+        except:
+            return None
+    
+    def mask_card_number(self, card_number):
+        """Маскування номера картки (показує тільки останні 4 цифри)"""
+        if not card_number:
+            return "**** **** **** ****"
+        
+        # Видаляємо всі пробіли
+        clean_number = card_number.replace(" ", "")
+        
+        if len(clean_number) < 4:
+            return "**** **** **** ****"
+        
+        # Повертаємо маскований номер з останніми 4 цифрами
+        return f"**** **** **** {clean_number[-4:]}"
+
+# Глобальний екземпляр шифрувальника
+card_encryptor = CardEncryption()
 
 class ModernBankCard(BoxLayout):
     def __init__(self, card_data, **kwargs):
@@ -84,15 +142,18 @@ class ModernBankCard(BoxLayout):
         header_layout.add_widget(bank_label)
         self.add_widget(header_layout)
         
-        # Номер картки (стилізований)
+        # Номер картки (стилізований) - ВИКОРИСТОВУЄМО МАСКОВАНИЙ НОМЕР
         number_layout = BoxLayout(
             size_hint_y=None,
             height=dp(40),
             orientation='vertical'
         )
         
+        # Отримуємо маскований номер картки
+        masked_number = card_data.get('masked_number', '**** **** **** ****')
+        
         number_label = Label(
-            text="•••• •••• •••• " + (card_data['number'][-4:] if len(card_data['number']) >= 4 else card_data['number']),
+            text=masked_number,
             font_size=dp(18),
             color=WHITE
         )
@@ -177,7 +238,6 @@ class WhitePopup(Popup):
         self.bg_rect.size = self.size
         self.border_line.rectangle = (self.x, self.y, self.width, self.height)
 
-
 class WhiteButton(Button):
     """Стилізована кнопка для білих попапів"""
     
@@ -210,7 +270,6 @@ class WhiteButton(Button):
             Color(*value)
             self.rect = Rectangle(pos=self.pos, size=self.size)
 
-
 class WhiteTextInput(TextInput):
     """Стилізоване текстове поле для білих попапів"""
     
@@ -241,7 +300,6 @@ class WhiteTextInput(TextInput):
     
     def _update_border(self, *args):
         self.border_line.rectangle = (self.x, self.y, self.width, self.height)
-
 
 class HomeTab(Screen):
     """Головний таб з балансом та транзакціями"""
@@ -304,13 +362,31 @@ class HomeTab(Screen):
                 self.ids.balance_label.text = "Загальний баланс: 0.00 $"
     
     def load_user_cards(self):
-        """Завантаження карток користувача"""
+        """Завантаження карток користувача з шифрованими номерами"""
         try:
             app = self.get_app()
             from db_manager import get_user_cards
             
             print("Завантаження карток...")
-            self.cards_data = get_user_cards(cursor, app.current_user_id)
+            raw_cards_data = get_user_cards(cursor, app.current_user_id)
+            
+            # Обробляємо дані карток - додаємо масковані номери
+            self.cards_data = []
+            for card in raw_cards_data:
+                # Створюємо копію картки з маскованим номером
+                processed_card = card.copy()
+                
+                # Додаємо маскований номер для відображення
+                processed_card['masked_number'] = card_encryptor.mask_card_number(card.get('number', ''))
+                
+                # Прибираємо повний номер з даних для безпеки
+                if 'number' in processed_card:
+                    del processed_card['number']
+                if 'full_number' in processed_card:
+                    del processed_card['full_number']
+                
+                self.cards_data.append(processed_card)
+            
             print(f"Завантажено {len(self.cards_data)} карток")
             
             self.update_bank_list()
@@ -603,12 +679,15 @@ class HomeTab(Screen):
             
             color = bank_colors.get(bank_name, [0.2, 0.4, 0.8, 1])
             
+            # ШИФРУЄМО НОМЕР КАРТКИ ПЕРЕД ЗБЕРЕЖЕННЯМ
+            encrypted_number = card_encryptor.encrypt_card_number(formatted_number)
+            
             from db_manager import create_user_card
             card_id = create_user_card(
                 cursor, conn, 
                 app.current_user_id, 
                 card_name, 
-                formatted_number,
+                encrypted_number,  # Використовуємо зашифрований номер
                 bank_name,
                 0.0,
                 color
@@ -627,7 +706,7 @@ class HomeTab(Screen):
             print(f"Помилка створення картки: {e}")
             self.show_error_message("Сталася помилка")
             return False
-    
+
     def show_card_management_modal(self, card_data):
         """Показати модальне вікно керування карткою"""
         content = BoxLayout(orientation='vertical', spacing=dp(15), padding=dp(20))
@@ -761,9 +840,9 @@ class HomeTab(Screen):
                     self.load_user_cards()
                     self.update_content()
                     
-                    # ЛОГУЄМО ТРАНЗАКЦІЮ
+                    # ЛОГУЄМО ТРАНЗАКЦІЮ - тільки один раз!
                     log_transaction(cursor, conn, self.get_app().current_user_id, 
-                                "card_deposit", amount, f"Поповнення картки {card_data['name']}")
+                                "deposit", amount, f"Поповнення картки {card_data['name']}")
                     
                     self.show_success_message(f"Картку '{card_data['name']}' поповнено на {amount:.2f} $!")
                 else:
@@ -817,7 +896,7 @@ class HomeTab(Screen):
         content.add_widget(name_input)
         
         number_input = WhiteTextInput(
-            text=card_data['number'].replace(' ', ''),
+            text=card_data.get('number', '').replace(' ', ''),
             hint_text="Номер картки",
             input_filter='int',
             size_hint_y=None,
@@ -1164,7 +1243,7 @@ class HomeTab(Screen):
             
             header_date = Label(
                 text="Дата",
-                size_hint_x=0.3,
+                size_hint_x=0.25,
                 color=DARK_GRAY,
                 font_size=dp(14),
                 bold=True
@@ -1172,7 +1251,7 @@ class HomeTab(Screen):
             
             header_desc = Label(
                 text="Опис",
-                size_hint_x=0.4,
+                size_hint_x=0.5,
                 color=DARK_GRAY,
                 font_size=dp(14),
                 bold=True
@@ -1180,7 +1259,7 @@ class HomeTab(Screen):
             
             header_amount = Label(
                 text="Сума",
-                size_hint_x=0.3,
+                size_hint_x=0.25,
                 color=DARK_GRAY,
                 font_size=dp(14),
                 bold=True
@@ -1199,6 +1278,11 @@ class HomeTab(Screen):
             
             for trans in transactions:
                 trans_type, amount, description, created_at = trans
+                
+                # ВИПРАВЛЕННЯ: Фільтруємо створення карток (card_creation)
+                if trans_type == 'card_creation':
+                    print("=== ДЕБАГ: Пропускаємо транзакцію створення картки ===")
+                    continue
                 
                 # Створюємо унікальний ключ для транзакції
                 trans_key = (trans_type, amount, description, created_at)
@@ -1247,7 +1331,7 @@ class HomeTab(Screen):
                     # Створюємо рядок транзакції
                     trans_layout = BoxLayout(
                         size_hint_y=None,
-                        height=dp(50),
+                        height=dp(55),
                         padding=[dp(10), dp(5), dp(10), dp(5)]
                     )
                     
@@ -1270,21 +1354,26 @@ class HomeTab(Screen):
                     
                     date_label = Label(
                         text=date_str,
-                        size_hint_x=0.3,
+                        size_hint_x=0.25,
                         color=DARK_TEXT,
                         font_size=dp(12)
                     )
                     
+                    # ВИПРАВЛЕННЯ: ВІДОБРАЖАЄМО ПОВНИЙ ОПИС БЕЗ ОБРІЗАННЯ
                     desc_label = Label(
-                        text=description[:20] + "..." if len(description) > 20 else description,
-                        size_hint_x=0.4,
+                        text=description,  # ВІДОБРАЖАЄМО ПОВНИЙ ТЕКСТ
+                        size_hint_x=0.5,
                         color=DARK_TEXT,
-                        font_size=dp(13)
+                        font_size=dp(13),
+                        text_size=(None, None),
+                        halign='left',
+                        valign='middle'
                     )
+                    desc_label.bind(size=desc_label.setter('text_size'))
                     
                     amount_label = Label(
                         text=f"{sign}{abs(amount):.2f} $",
-                        size_hint_x=0.3,
+                        size_hint_x=0.25,
                         color=amount_color,
                         font_size=dp(13),
                         bold=True
