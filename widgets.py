@@ -42,7 +42,7 @@ class SavingsPlanItem(BoxLayout):
         super().__init__(**kwargs)
     
     def on_touch_down(self, touch):
-        """Обробка дотику для вибору плану."""
+     
         if self.collide_point(*touch.pos):
             if self.on_plan_select:
                 self.on_plan_select(self.plan_id, self.plan_name)

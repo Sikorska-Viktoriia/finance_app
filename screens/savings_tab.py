@@ -14,7 +14,7 @@ from kivy.graphics import Color, Rectangle, Line
 from db_manager import cursor, conn, log_transaction, log_savings_transaction, get_user_cards, get_user_card_by_id
 from widgets import SavingsPlanItem
 
-# Кольори
+
 PRIMARY_PINK = (0.95, 0.3, 0.5, 1)
 PRIMARY_BLUE = (0.2, 0.7, 0.9, 1)
 LIGHT_PINK = (1, 0.95, 0.95, 1)
@@ -28,10 +28,10 @@ DARK_GRAY = (0.4, 0.4, 0.4, 1)
 
 
 class WhitePopup(Popup):
-    """Базовий клас білого попапу з темним текстом"""
+
     
     def __init__(self, **kwargs):
-        # Видаляємо всі параметри фону, щоб уникнути конфліктів
+
         kwargs.pop('background', '')
         kwargs.pop('background_color', None)
         kwargs.pop('background_normal', None)
@@ -39,36 +39,35 @@ class WhitePopup(Popup):
         
         super().__init__(**kwargs)
         
-        # Робимо фон повністю прозорим
+
         self.background = ''
         self.background_color = [1, 1, 1, 0]
         self.separator_height = 0
         self.auto_dismiss = False
-        
-        # Створюємо білий фон через canvas
+
         with self.canvas.before:
             Color(*WHITE)
             self.bg_rect = Rectangle(pos=self.pos, size=self.size)
             
-            # Додаємо темну рамку
+
             Color(*DARK_GRAY)
             self.border_line = Line(
                 rectangle=(self.x, self.y, self.width, self.height),
                 width=1.2
             )
         
-        # Прив'язуємо оновлення позиції та розміру
+
         self.bind(pos=self._update_graphics, size=self._update_graphics)
     
     def _update_graphics(self, *args):
-        """Оновлюємо графічні елементи при зміні позиції чи розміру"""
+
         self.bg_rect.pos = self.pos
         self.bg_rect.size = self.size
         self.border_line.rectangle = (self.x, self.y, self.width, self.height)
 
 
 class WhiteButton(Button):
-    """Стилізована кнопка для білих попапів"""
+
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -81,7 +80,7 @@ class WhiteButton(Button):
         self.height = dp(45)
         self.bold = True
         
-        # Додаємо фон через canvas
+
         with self.canvas.before:
             Color(*self.background_color)
             self.rect = Rectangle(pos=self.pos, size=self.size)
@@ -101,7 +100,7 @@ class WhiteButton(Button):
 
 
 class WhiteTextInput(TextInput):
-    """Стилізоване текстове поле для білих попапів"""
+
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -118,7 +117,7 @@ class WhiteTextInput(TextInput):
         self.hint_text_color = LIGHT_GRAY
         self.write_tab = False
         
-        # Додаємо рамку
+
         with self.canvas.after:
             Color(*DARK_GRAY)
             self.border_line = Line(
@@ -133,7 +132,7 @@ class WhiteTextInput(TextInput):
 
 
 class DatePickerPopup(WhitePopup):
-    """Календар з білим дизайном та темним текстом"""
+
     
     def __init__(self, callback, **kwargs):
         self.callback = callback
@@ -142,10 +141,10 @@ class DatePickerPopup(WhitePopup):
         self.create_widgets()
     
     def create_widgets(self):
-        # Основний контейнер
+
         content = BoxLayout(orientation='vertical', spacing=dp(15), padding=dp(20))
         
-        # Додаємо білий фон для контенту
+
         with content.canvas.before:
             Color(*WHITE)
             self.content_rect = Rectangle(pos=content.pos, size=content.size)
@@ -155,7 +154,7 @@ class DatePickerPopup(WhitePopup):
             size=self._update_content_rect
         )
         
-        # Заголовок з поточною датою
+
         self.date_label = Label(
             text=self.selected_date.strftime('%d.%m.%Y'),
             font_size=dp(24),
@@ -166,28 +165,26 @@ class DatePickerPopup(WhitePopup):
         )
         content.add_widget(self.date_label)
         
-        # Навігація по датах
+
         nav_layout = BoxLayout(
             orientation='horizontal', 
             size_hint_y=None, 
             height=dp(50), 
             spacing=dp(10)
         )
-        
-        # Кнопка попереднього дня
+
         prev_btn = WhiteButton(text='<')
         prev_btn.background_color = LIGHT_GRAY
         prev_btn.color = DARK_TEXT
         prev_btn.bind(on_press=self.prev_day)
         nav_layout.add_widget(prev_btn)
         
-        # Кнопка "сьогодні"
+
         today_btn = WhiteButton(text='СЬОГОДНІ')
         today_btn.background_color = PRIMARY_PINK
         today_btn.bind(on_press=self.set_today)
         nav_layout.add_widget(today_btn)
-        
-        # Кнопка наступного дня
+
         next_btn = WhiteButton(text='>')
         next_btn.background_color = LIGHT_GRAY
         next_btn.color = DARK_TEXT
@@ -196,7 +193,7 @@ class DatePickerPopup(WhitePopup):
         
         content.add_widget(nav_layout)
         
-        # Швидкий вибір дат
+
         quick_layout = GridLayout(cols=3, spacing=dp(8), size_hint_y=None, height=dp(120))
         
         quick_buttons = [
@@ -216,7 +213,7 @@ class DatePickerPopup(WhitePopup):
         
         content.add_widget(quick_layout)
         
-        # Кнопки дій
+
         btn_layout = BoxLayout(
             orientation='horizontal', 
             spacing=dp(15), 
@@ -224,13 +221,13 @@ class DatePickerPopup(WhitePopup):
             height=dp(50)
         )
         
-        # Кнопка вибору дати
+
         select_btn = WhiteButton(text='ОБРАТИ ДАТУ')
         select_btn.background_color = PRIMARY_PINK
         select_btn.bind(on_press=self.select_date)
         btn_layout.add_widget(select_btn)
         
-        # Кнопка скасування
+     
         cancel_btn = WhiteButton(text='СКАСУВАТИ')
         cancel_btn.background_color = LIGHT_GRAY
         cancel_btn.color = DARK_TEXT
@@ -242,7 +239,7 @@ class DatePickerPopup(WhitePopup):
         self.content = content
     
     def _update_content_rect(self, instance, value):
-        """Оновлюємо фон контенту"""
+      
         self.content_rect.pos = instance.pos
         self.content_rect.size = instance.size
     
@@ -275,7 +272,7 @@ class SavingsTab(Screen):
         super().__init__(**kwargs)
         self.selected_plan_id = None
         self.selected_plan_name = ""
-        self.user_cards = []  # Список карток користувача
+        self.user_cards = []  
     
     def get_app(self):
         return App.get_running_app()
@@ -286,7 +283,7 @@ class SavingsTab(Screen):
         self.load_user_cards()
     
     def load_user_cards(self):
-        """Завантажити карти користувача"""
+ 
         try:
             app = self.get_app()
             if hasattr(app, 'current_user_id') and app.current_user_id:
@@ -373,10 +370,10 @@ class SavingsTab(Screen):
                 
                 is_completed = current >= target
                 
-                # Контейнер для плану з кнопками операцій
+         
                 plan_container = BoxLayout(orientation='vertical', size_hint_y=None, height=dp(160))
                 
-                # Додаємо сам план
+             
                 plan_item = SavingsPlanItem()
                 plan_item.plan_name = name
                 plan_item.current_amount = current
@@ -397,7 +394,7 @@ class SavingsTab(Screen):
                 
                 plan_container.add_widget(plan_item)
                 
-                # Кнопки операцій
+
                 operations_layout = BoxLayout(
                     orientation='horizontal', 
                     size_hint_y=None, 
@@ -405,8 +402,7 @@ class SavingsTab(Screen):
                     spacing=dp(5),
                     padding=[dp(10), dp(5), dp(10), dp(5)]
                 )
-                
-                # Поле для введення суми
+    
                 amount_input = WhiteTextInput(
                     hint_text='Сума',
                     input_filter='float',
@@ -414,8 +410,7 @@ class SavingsTab(Screen):
                     font_size=dp(14)
                 )
                 operations_layout.add_widget(amount_input)
-                
-                # Кнопка додати
+     
                 add_btn = Button(
                     text='Додати',
                     size_hint_x=0.2,
@@ -431,7 +426,7 @@ class SavingsTab(Screen):
                 add_btn.bind(on_press=make_add_callback(plan_id, name, amount_input))
                 operations_layout.add_widget(add_btn)
                 
-                # Кнопка вилучити
+                
                 withdraw_btn = Button(
                     text='Вилучити',
                     size_hint_x=0.2,
@@ -447,7 +442,7 @@ class SavingsTab(Screen):
                 withdraw_btn.bind(on_press=make_withdraw_callback(plan_id, name, amount_input))
                 operations_layout.add_widget(withdraw_btn)
                 
-                # Кнопка завершити або редагувати
+                
                 if is_completed:
                     complete_btn = Button(
                         text='Завершити',
@@ -479,7 +474,7 @@ class SavingsTab(Screen):
                     edit_btn.bind(on_press=make_edit_callback(plan_id, name))
                     operations_layout.add_widget(edit_btn)
                 
-                # Кнопка видалити
+                
                 delete_btn = Button(
                     text='×',
                     size_hint_x=0.15,
@@ -510,7 +505,7 @@ class SavingsTab(Screen):
             savings_container.add_widget(error_label)
     
     def on_plan_select(self, plan_id, plan_name):
-        """Обробка вибору плану"""
+      
         self.selected_plan_id = plan_id
         self.selected_plan_name = plan_name
         self.update_savings_tab()
@@ -520,7 +515,7 @@ class SavingsTab(Screen):
             self.ids.savings_message.color = SUCCESS_GREEN
     
     def create_savings_plan(self):
-        """Створення нового плану заощаджень"""
+       
         if not hasattr(self, 'ids'):
             return
             
@@ -582,7 +577,7 @@ class SavingsTab(Screen):
             self.ids.savings_message.color = ERROR_RED
     
     def add_to_plan(self, plan_id, plan_name, amount_text, card_id=None):
-        """Додавання грошей до плану з вибраної картки"""
+        
         if not amount_text:
             self.ids.savings_message.text = "Введіть суму"
             self.ids.savings_message.color = ERROR_RED
@@ -597,12 +592,12 @@ class SavingsTab(Screen):
             
             app = self.get_app()
             
-            # Якщо картка не вибрана, показуємо попап вибору
+
             if not card_id:
                 self.show_card_selection_popup(plan_id, plan_name, amount, "add")
                 return
             
-            # Перевіряємо баланс на вибраній картці
+
             selected_card = get_user_card_by_id(cursor, card_id)
             
             if not selected_card:
@@ -634,13 +629,13 @@ class SavingsTab(Screen):
                 self.ids.savings_message.color = ERROR_RED
                 return
             
-            # Знімаємо гроші з картки
+            
             cursor.execute(
                 "UPDATE user_cards SET balance = balance - ? WHERE id = ?",
                 (amount, card_id)
             )
             
-            # Оновлюємо план заощаджень
+          
             cursor.execute(
                 "UPDATE savings_plans SET current_amount = current_amount + ? WHERE id = ?",
                 (amount, plan_id)
@@ -679,7 +674,7 @@ class SavingsTab(Screen):
             app.root.home_tab.update_transactions_history()
 
     def remove_from_plan(self, plan_id, plan_name, amount_text, card_id=None):
-        """Вилучення грошей з плану на вибрану картку"""
+ 
         if not amount_text:
             self.ids.savings_message.text = "Введіть суму"
             self.ids.savings_message.color = ERROR_RED
@@ -694,7 +689,7 @@ class SavingsTab(Screen):
             
             app = self.get_app()
             
-            # Якщо картка не вибрана, показуємо попап вибору
+     
             if not card_id:
                 self.show_card_selection_popup(plan_id, plan_name, amount, "remove")
                 return
@@ -717,13 +712,13 @@ class SavingsTab(Screen):
                 self.ids.savings_message.color = ERROR_RED
                 return
             
-            # Додаємо гроші на картку
+            
             cursor.execute(
                 "UPDATE user_cards SET balance = balance + ? WHERE id = ?",
                 (amount, card_id)
             )
             
-            # Оновлюємо план заощаджень
+            
             cursor.execute(
                 "UPDATE savings_plans SET current_amount = current_amount - ? WHERE id = ?",
                 (amount, plan_id)
@@ -765,7 +760,7 @@ class SavingsTab(Screen):
             app.root.home_tab.update_transactions_history()
 
     def show_card_selection_popup(self, plan_id, plan_name, amount, operation_type):
-        """Попап для вибору картки"""
+        
         if not self.user_cards:
             self.ids.savings_message.text = "У вас немає карток"
             self.ids.savings_message.color = ERROR_RED
@@ -799,7 +794,7 @@ class SavingsTab(Screen):
         )
         content.add_widget(info_label)
         
-        # Список карток
+     
         card_spinner = Spinner(
             text=self.user_cards[0]['name'],
             values=[card['name'] for card in self.user_cards],
@@ -810,7 +805,7 @@ class SavingsTab(Screen):
         )
         content.add_widget(card_spinner)
         
-        # Кнопки
+        
         btn_layout = BoxLayout(orientation='horizontal', spacing=dp(15), size_hint_y=None, height=dp(50))
         
         def confirm_selection(_):
@@ -845,12 +840,12 @@ class SavingsTab(Screen):
         popup.open()
     
     def _update_content_rect(self, instance, value):
-        """Оновлюємо фон контенту для попапів"""
+        
         self.content_rect.pos = instance.pos
         self.content_rect.size = instance.size
 
     def complete_savings_plan(self, plan_id, plan_name):
-        """Завершення плану заощаджень з переведенням грошей на вибрану картку"""
+        
         try:
             app = self.get_app()
             cursor.execute(
@@ -871,7 +866,7 @@ class SavingsTab(Screen):
                 self.ids.savings_message.color = ERROR_RED
                 return
             
-            # Показуємо попап вибору картки для завершення плану
+            
             self.show_card_selection_for_completion(plan_id, plan_name, current_amount)
             
         except Exception as e:
@@ -880,7 +875,7 @@ class SavingsTab(Screen):
             self.ids.savings_message.color = ERROR_RED
     
     def show_card_selection_for_completion(self, plan_id, plan_name, amount):
-        """Попап для вибору картки при завершенні плану"""
+       
         if not self.user_cards:
             self.ids.savings_message.text = "У вас немає карток"
             self.ids.savings_message.color = ERROR_RED
@@ -913,7 +908,7 @@ class SavingsTab(Screen):
         )
         content.add_widget(info_label)
         
-        # Список карток
+   
         card_spinner = Spinner(
             text=self.user_cards[0]['name'],
             values=[card['name'] for card in self.user_cards],
@@ -924,7 +919,7 @@ class SavingsTab(Screen):
         )
         content.add_widget(card_spinner)
         
-        # Кнопки
+     
         btn_layout = BoxLayout(orientation='horizontal', spacing=dp(15), size_hint_y=None, height=dp(50))
         
         def confirm_completion(_):
@@ -935,13 +930,13 @@ class SavingsTab(Screen):
                 try:
                     app = self.get_app()
                     
-                    # Додаємо гроші на картку
+                 
                     cursor.execute(
                         "UPDATE user_cards SET balance = balance + ? WHERE id = ?",
                         (amount, selected_card['id'])
                     )
                     
-                    # Позначаємо план як завершений
+                
                     cursor.execute(
                         "UPDATE savings_plans SET status='completed', current_amount=0 WHERE id=?",
                         (plan_id,)
@@ -997,28 +992,28 @@ class SavingsTab(Screen):
         popup.open()
 
     def edit_specific_plan(self, plan_id, plan_name):
-        """Редагування конкретного плану"""
+     
         self.selected_plan_id = plan_id
         self.selected_plan_name = plan_name
         self.edit_savings_plan()
 
     def delete_specific_plan(self, plan_id, plan_name):
-        """Видалення конкретного плану"""
+      
         self.selected_plan_id = plan_id
         self.selected_plan_name = plan_name
         self.delete_savings_plan()
 
     def edit_savings_plan(self):
-        """Редагування обраного плану заощаджень з білим попапом"""
+       
         if not self.selected_plan_id:
             self.ids.savings_message.text = "Будь ласка, оберіть план для редагування"
             self.ids.savings_message.color = ERROR_RED
             return
         
-        # Створюємо попап редагування
+ 
         content = BoxLayout(orientation='vertical', spacing=dp(15), padding=dp(25))
         
-        # Додаємо білий фон для контенту
+        
         with content.canvas.before:
             Color(*WHITE)
             self.content_rect = Rectangle(pos=content.pos, size=content.size)
@@ -1028,7 +1023,7 @@ class SavingsTab(Screen):
             size=self._update_content_rect
         )
         
-        # Отримуємо поточні дані плану
+       
         cursor.execute(
             "SELECT name, target_amount, deadline FROM savings_plans WHERE id = ?",
             (self.selected_plan_id,)
@@ -1040,7 +1035,7 @@ class SavingsTab(Screen):
         
         current_name, current_target, current_deadline = plan_data
         
-        # Поле введення назви
+        
         name_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(45))
         name_layout.add_widget(Label(
             text='Назва:', 
@@ -1055,7 +1050,7 @@ class SavingsTab(Screen):
         name_layout.add_widget(name_input)
         content.add_widget(name_layout)
         
-        # Поле введення цільової суми
+      
         target_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(45))
         target_layout.add_widget(Label(
             text='Цільова сума:', 
@@ -1070,7 +1065,7 @@ class SavingsTab(Screen):
         target_layout.add_widget(target_input)
         content.add_widget(target_layout)
         
-        # Поле введення дедлайну з календарем
+       
         deadline_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(45))
         deadline_layout.add_widget(Label(
             text='Дедлайн:', 
@@ -1086,7 +1081,7 @@ class SavingsTab(Screen):
         )
         deadline_layout.add_widget(deadline_input)
         
-        calendar_btn = WhiteButton(text='📅')
+        calendar_btn = WhiteButton(text='/')
         calendar_btn.background_color = PRIMARY_BLUE
         
         def show_calendar(_):
@@ -1104,7 +1099,7 @@ class SavingsTab(Screen):
         
         content.add_widget(deadline_layout)
         
-        # Кнопки
+
         btn_layout = BoxLayout(orientation='horizontal', spacing=dp(15), size_hint_y=None, height=dp(50))
         
         def save_plan(_):
@@ -1183,16 +1178,16 @@ class SavingsTab(Screen):
         popup.open()
 
     def delete_savings_plan(self):
-        """Видалення обраного плану заощаджень з білим попапом підтвердження"""
+     
         if not self.selected_plan_id:
             self.ids.savings_message.text = "Будь ласка, оберіть план для видалення"
             self.ids.savings_message.color = ERROR_RED
             return
         
-        # Створюємо попап підтвердження
+  
         content = BoxLayout(orientation='vertical', spacing=dp(20), padding=dp(25))
         
-        # Додаємо білий фон для контенту
+        
         with content.canvas.before:
             Color(*WHITE)
             self.content_rect = Rectangle(pos=content.pos, size=content.size)
@@ -1229,12 +1224,12 @@ class SavingsTab(Screen):
             try:
                 app = self.get_app()
                 
-                # Повертаємо гроші на картку, якщо вони є
+            
                 if current_amount > 0:
-                    # Показуємо попап вибору картки для повернення коштів
+                
                     self.show_card_selection_for_deletion(self.selected_plan_id, self.selected_plan_name, current_amount)
                 else:
-                    # Просто видаляємо план без коштів
+                    
                     cursor.execute("DELETE FROM savings_plans WHERE id=?", (self.selected_plan_id,))
                     
                     log_savings_transaction(
@@ -1281,7 +1276,7 @@ class SavingsTab(Screen):
         popup.open()
     
     def show_card_selection_for_deletion(self, plan_id, plan_name, amount):
-        """Попап для вибору картки при видаленні плану з коштами"""
+        
         if not self.user_cards:
             self.ids.savings_message.text = "У вас немає карток"
             self.ids.savings_message.color = ERROR_RED
@@ -1314,7 +1309,7 @@ class SavingsTab(Screen):
         )
         content.add_widget(info_label)
         
-        # Список карток
+       
         card_spinner = Spinner(
             text=self.user_cards[0]['name'],
             values=[card['name'] for card in self.user_cards],
@@ -1325,7 +1320,7 @@ class SavingsTab(Screen):
         )
         content.add_widget(card_spinner)
         
-        # Кнопки
+  
         btn_layout = BoxLayout(orientation='horizontal', spacing=dp(15), size_hint_y=None, height=dp(50))
         
         def confirm_deletion(_):
@@ -1336,13 +1331,13 @@ class SavingsTab(Screen):
                 try:
                     app = self.get_app()
                     
-                    # Додаємо гроші на картку
+                   
                     cursor.execute(
                         "UPDATE user_cards SET balance = balance + ? WHERE id = ?",
                         (amount, selected_card['id'])
                     )
                     
-                    # Видаляємо план
+                   
                     cursor.execute("DELETE FROM savings_plans WHERE id=?", (plan_id,))
                     
                     log_transaction(

@@ -4,16 +4,16 @@ from kivy.uix.screenmanager import ScreenManager, SlideTransition
 from kivy.core.window import Window
 from kivy.properties import StringProperty, NumericProperty
 
-# Import screens
+
 from screens import (StartScreen, RegistrationScreen, LoginScreen, 
                     DashboardScreen, HomeTab, SavingsTab, AnalyticsTab, 
                     AITab, AccountTab)
 
-# Load KV file
+
 Builder.load_file("kv/screens.kv")
 
 class FinanceScreenManager(ScreenManager):
-    # Властивості для зберігання даних користувача
+
     current_user = StringProperty("")
     current_user_id = NumericProperty(0)
     balance = NumericProperty(0.0)
@@ -21,7 +21,7 @@ class FinanceScreenManager(ScreenManager):
 class FinanceApp(App):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        # Зберігаємо дані користувача в додатку
+
         self.current_user = ""
         self.current_user_id = 0
         self.balance = 0.0
@@ -34,15 +34,15 @@ class FinanceApp(App):
         sm.add_widget(RegistrationScreen(name="registration_screen"))
         sm.add_widget(LoginScreen(name="login_screen"))
         
-        # Create dashboard with tabs
+
         dashboard = DashboardScreen(name="dashboard_screen")
         
-        # Додаємо вкладки до tab_manager Dashboard з унікальними назвами
+
         dashboard.ids.tab_manager.add_widget(HomeTab(name="home_tab"))
         dashboard.ids.tab_manager.add_widget(AnalyticsTab(name="analytics_tab"))
         dashboard.ids.tab_manager.add_widget(SavingsTab(name="savings_tab"))
         dashboard.ids.tab_manager.add_widget(AITab(name="ai_tab"))
-        dashboard.ids.tab_manager.add_widget(AccountTab(name="account_tab"))  # Змінено на account_tab
+        dashboard.ids.tab_manager.add_widget(AccountTab(name="account_tab"))  
         
         sm.add_widget(dashboard)
         

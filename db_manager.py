@@ -8,9 +8,7 @@ import string
 import secrets
 import traceback
 
-# -----------------------
-# Database Initialization
-# -----------------------
+
 DB_NAME = "users.db"
 SALT = "flamingo_secure_salt_2024"
 
@@ -134,7 +132,7 @@ def init_database():
         )
     ''')
 
-    # НОВІ ТАБЛИЦІ ДЛЯ АКАУНТА
+
     # User profile photos table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS user_profile_photos(
@@ -203,7 +201,7 @@ def init_database():
         )
     ''')
 
-    # ДОДАЙТЕ ЦЮ ТАБЛИЦЮ ДЛЯ AI ЧАТУ
+
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS ai_chat_history(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -231,9 +229,9 @@ def init_database():
     return conn, cursor
 
 def fix_database_schema(conn, cursor):
-    """Fix database schema by adding missing columns"""
+
     try:
-        # Check and add missing columns to transactions table
+
         cursor.execute("PRAGMA table_info(transactions)")
         columns = [column[1] for column in cursor.fetchall()]
         
@@ -244,7 +242,7 @@ def fix_database_schema(conn, cursor):
     except Exception as e:
         print(f"Schema fix error: {e}")
 
-# Security & Validation Functions
+
 def is_valid_email(email):
     pattern = r'^[\w\.-]+@[\w\.-]+\.[a-zA-Z]{2,}$'
     return re.match(pattern, email) is not None
@@ -280,9 +278,9 @@ def safe_color_conversion(color):
                 return [0.2, 0.4, 0.8, 1]
     return [0.2, 0.4, 0.8, 1]
 
-# User Management Functions
+
 def create_user(cursor, conn, username, email, password):
-    """Створює нового користувача"""
+  
     try:
         if not is_valid_email(email):
             return None, "Невірний формат email"
@@ -303,19 +301,19 @@ def create_user(cursor, conn, username, email, password):
         
         user_id = cursor.lastrowid
         
-        # Create wallet for user
+
         cursor.execute(
             "INSERT INTO wallets (user_id, balance) VALUES (?, ?)",
             (user_id, 0.0)
         )
         
-        # Create default settings
+
         cursor.execute(
             "INSERT INTO user_settings (user_id) VALUES (?)",
             (user_id,)
         )
         
-        # Create default level entry
+        
         cursor.execute(
             "INSERT INTO user_levels (user_id) VALUES (?)",
             (user_id,)
@@ -329,7 +327,7 @@ def create_user(cursor, conn, username, email, password):
         return None, "Помилка створення користувача"
 
 def get_user_by_email(cursor, email):
-    """Отримує користувача за email"""
+
     try:
         cursor.execute(
             "SELECT id, username, email, password FROM users WHERE email=?",
@@ -350,11 +348,11 @@ def get_user_by_email(cursor, email):
         print(f"Error getting user by email: {e}")
         return None
 
-# НОВІ ФУНКЦІЇ ДЛЯ АКАУНТА
+
 def save_profile_photo(cursor, conn, user_id, photo_path):
-    """Save user profile photo path to database."""
+    
     try:
-        # Delete old photo if exists
+    
         cursor.execute("DELETE FROM user_profile_photos WHERE user_id=?", (user_id,))
         
         cursor.execute(
@@ -368,7 +366,7 @@ def save_profile_photo(cursor, conn, user_id, photo_path):
         return False
 
 def get_profile_photo(cursor, user_id):
-    """Get user profile photo path."""
+    
     try:
         cursor.execute(
             "SELECT photo_path FROM user_profile_photos WHERE user_id=? ORDER BY created_at DESC LIMIT 1",
@@ -381,9 +379,9 @@ def get_profile_photo(cursor, user_id):
         return None
 
 def log_user_session(cursor, conn, user_id, device_info="", ip_address=""):
-    """Log user login session."""
+   
     try:
-        # Deactivate old sessions
+        
         cursor.execute(
             "UPDATE user_sessions SET is_active=0 WHERE user_id=?",
             (user_id,)
@@ -400,7 +398,7 @@ def log_user_session(cursor, conn, user_id, device_info="", ip_address=""):
         return None
 
 def log_user_logout(cursor, conn, session_id):
-    """Log user logout."""
+   
     try:
         cursor.execute(
             "UPDATE user_sessions SET logout_time=CURRENT_TIMESTAMP, is_active=0 WHERE id=?",
@@ -413,7 +411,7 @@ def log_user_logout(cursor, conn, session_id):
         return False
 
 def get_login_history(cursor, user_id, limit=10):
-    """Get user login history."""
+
     try:
         cursor.execute('''
             SELECT device_info, ip_address, login_time, logout_time 
@@ -442,7 +440,7 @@ def get_login_history(cursor, user_id, limit=10):
         return []
 
 def calculate_session_duration(login_time, logout_time):
-    """Calculate session duration."""
+ 
     try:
         if not logout_time:
             return "Active"
@@ -462,7 +460,7 @@ def calculate_session_duration(login_time, logout_time):
         return "Unknown"
 
 def get_user_settings(cursor, user_id):
-    """Get user settings."""
+  
     try:
         cursor.execute(
             "SELECT theme, language, notifications_enabled, biometric_auth FROM user_settings WHERE user_id=?",
@@ -479,7 +477,7 @@ def get_user_settings(cursor, user_id):
                 'biometric_auth': bool(biometric)
             }
         else:
-            # Create default settings if not exist
+           
             cursor.execute(
                 "INSERT INTO user_settings (user_id) VALUES (?)",
                 (user_id,)
@@ -501,14 +499,14 @@ def get_user_settings(cursor, user_id):
         }
 
 def update_user_settings(cursor, conn, user_id, theme=None, language=None, notifications_enabled=None, biometric_auth=None):
-    """Update user settings."""
+
     try:
-        # Check if settings exist
+  
         cursor.execute("SELECT id FROM user_settings WHERE user_id=?", (user_id,))
         existing = cursor.fetchone()
         
         if existing:
-            # Update existing
+        
             update_fields = []
             params = []
             
@@ -531,7 +529,7 @@ def update_user_settings(cursor, conn, user_id, theme=None, language=None, notif
                 params.append(user_id)
                 cursor.execute(query, params)
         else:
-            # Insert new
+            
             cursor.execute('''
                 INSERT INTO user_settings 
                 (user_id, theme, language, notifications_enabled, biometric_auth) 
@@ -551,7 +549,7 @@ def update_user_settings(cursor, conn, user_id, theme=None, language=None, notif
         return False
 
 def get_user_level(cursor, user_id):
-    """Get user level and experience."""
+
     try:
         cursor.execute(
             "SELECT level, experience, achievements FROM user_levels WHERE user_id=?",
@@ -569,7 +567,7 @@ def get_user_level(cursor, user_id):
                 'progress_percentage': min((experience / (level * 100)) * 100, 100) if level > 0 else 0
             }
         else:
-            # Create default level entry if not exist
+   
             cursor.execute(
                 "INSERT INTO user_levels (user_id) VALUES (?)",
                 (user_id,)
@@ -593,7 +591,7 @@ def get_user_level(cursor, user_id):
         }
 
 def update_user_experience(cursor, conn, user_id, xp_gained, achievement=None):
-    """Update user experience and check for level up."""
+
     try:
         cursor.execute("SELECT level, experience, achievements FROM user_levels WHERE user_id=?", (user_id,))
         result = cursor.fetchone()
@@ -605,12 +603,12 @@ def update_user_experience(cursor, conn, user_id, xp_gained, achievement=None):
             new_experience = experience + xp_gained
             new_level = level
             
-            # Check for level up
+      
             while new_experience >= new_level * 100:
                 new_experience -= new_level * 100
                 new_level += 1
             
-            # Add achievement if provided
+    
             if achievement and achievement not in achievements:
                 achievements.append(achievement)
             
@@ -621,7 +619,7 @@ def update_user_experience(cursor, conn, user_id, xp_gained, achievement=None):
             ''', (new_level, new_experience, json.dumps(achievements), user_id))
             
         else:
-            # Create new entry
+         
             achievements = [achievement] if achievement else []
             cursor.execute('''
                 INSERT INTO user_levels (user_id, level, experience, achievements)
@@ -635,7 +633,7 @@ def update_user_experience(cursor, conn, user_id, xp_gained, achievement=None):
         return False
 
 def log_security_action(cursor, conn, user_id, action_type, description="", ip_address="", device_info=""):
-    """Log security-related actions."""
+   
     try:
         cursor.execute('''
             INSERT INTO security_logs (user_id, action_type, description, ip_address, device_info)
@@ -649,9 +647,9 @@ def log_security_action(cursor, conn, user_id, action_type, description="", ip_a
         return False
 
 def export_user_data(cursor, user_id):
-    """Export all user data as JSON."""
+  
     try:
-        # Get user basic info
+   
         cursor.execute("SELECT username, email, created_at FROM users WHERE id=?", (user_id,))
         user_info = cursor.fetchone()
         
@@ -660,7 +658,7 @@ def export_user_data(cursor, user_id):
         
         username, email, created_at = user_info
         
-        # Build export data
+     
         export_data = {
             'export_info': {
                 'export_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
@@ -691,7 +689,7 @@ def export_user_data(cursor, user_id):
         return None
 
 def get_user_savings_plans(cursor, user_id):
-    """Get user savings plans."""
+   
     try:
         cursor.execute(
             "SELECT id, name, target_amount, current_amount, deadline, status FROM savings_plans WHERE user_id=?",
@@ -717,9 +715,9 @@ def get_user_savings_plans(cursor, user_id):
         print(f"Error getting savings plans: {e}")
         return []
 
-# Analytics Functions
+
 def get_analytics_data(cursor, user_id, period='month', category=None, card_id=None):
-    """Отримати дані для аналітики"""
+    
     try:
         end_date = datetime.now()
         if period == 'today':
@@ -791,7 +789,7 @@ def get_analytics_data(cursor, user_id, period='month', category=None, card_id=N
         }
 
 def get_category_breakdown(cursor, user_id, period='month'):
-    """Отримати розподіл по категоріях"""
+ 
     try:
         end_date = datetime.now()
         if period == 'today':
@@ -869,7 +867,7 @@ def get_category_breakdown(cursor, user_id, period='month'):
         return []
 
 def get_top_categories(cursor, user_id, period='month', limit=5):
-    """Отримати ТОП категорії витрат"""
+
     try:
         category_data = get_category_breakdown(cursor, user_id, period)
         return category_data[:limit]
@@ -878,7 +876,7 @@ def get_top_categories(cursor, user_id, period='month', limit=5):
         return []
 
 def get_cards_analytics(cursor, user_id, period='month'):
-    """Отримати аналітику по картках"""
+
     try:
         end_date = datetime.now()
         if period == 'today':
@@ -935,7 +933,7 @@ def get_cards_analytics(cursor, user_id, period='month'):
         return []
 
 def get_budget_progress(cursor, user_id):
-    """Отримати прогрес по бюджетах (конвертах)"""
+  
     try:
         envelopes = get_user_envelopes(cursor, user_id)
         budget_data = []
@@ -962,7 +960,7 @@ def get_budget_progress(cursor, user_id):
         return []
 
 def get_insights_and_forecasts(cursor, user_id):
-    """Отримати інсайти та прогнози"""
+
     try:
         insights = []
         
@@ -972,13 +970,13 @@ def get_insights_and_forecasts(cursor, user_id):
         budgets = get_budget_progress(cursor, user_id)
         for budget in budgets:
             if budget['percentage'] > 90:
-                insights.append(f"⚠️ Можлива перевитрата в конверті '{budget['name']}' - використано {budget['percentage']}%")
+                insights.append(f" Можлива перевитрата в конверті '{budget['name']}' - використано {budget['percentage']}%")
             elif budget['percentage'] > 75:
-                insights.append(f"🔔 Конверт '{budget['name']}' майже заповнений - {budget['percentage']}%")
+                insights.append(f" Конверт '{budget['name']}' майже заповнений - {budget['percentage']}%")
         
         if current_data['total_expenses'] > previous_data['total_expenses'] * 1.2:
             increase_percent = ((current_data['total_expenses'] - previous_data['total_expenses']) / previous_data['total_expenses'] * 100)
-            insights.append(f"📈 Зростання витрат на {increase_percent:.1f}% порівняно з минулим місяцем")
+            insights.append(f" Зростання витрат на {increase_percent:.1f}% порівняно з минулим місяцем")
         
         today = datetime.now()
         days_passed = today.day
@@ -986,22 +984,22 @@ def get_insights_and_forecasts(cursor, user_id):
         daily_avg = current_data['average_daily']
         projected_expenses = daily_avg * days_in_month
         
-        insights.append(f"🔮 Прогноз витрат до кінця місяця: ${projected_expenses:.2f}")
+        insights.append(f" Прогноз витрат до кінця місяця: ${projected_expenses:.2f}")
         
         savings_rate = current_data['savings_rate']
         if savings_rate > 20:
-            insights.append(f"💰 Відмінно! Ваш рівень заощаджень: {savings_rate}%")
+            insights.append(f" Відмінно! Ваш рівень заощаджень: {savings_rate}%")
         elif savings_rate < 10:
-            insights.append(f"💡 Можна покращити заощадження. Поточний рівень: {savings_rate}%")
+            insights.append(f" Можна покращити заощадження. Поточний рівень: {savings_rate}%")
         
         return insights
         
     except Exception as e:
         print(f"Error getting insights: {e}")
-        return ["💡 Аналіз даних тимчасово недоступний"]
+        return [" Аналіз даних тимчасово недоступний"]
 
 def get_monthly_comparison(cursor, user_id, months=6):
-    """Отримати порівняння по місяцях"""
+   
     try:
         monthly_data = []
         
@@ -1035,9 +1033,9 @@ def get_monthly_comparison(cursor, user_id, months=6):
         print(f"Error getting monthly comparison: {e}")
         return []
 
-# Card Management Functions
+
 def create_user_card(cursor, conn, user_id, name, number, bank, balance=0.0, color=None):
-    """Create a new card for user"""
+
     try:
         if color is None:
             color = '[0.2, 0.4, 0.8, 1]'
@@ -1060,7 +1058,7 @@ def create_user_card(cursor, conn, user_id, name, number, bank, balance=0.0, col
         return None
 
 def get_user_cards(cursor, user_id):
-    """Get all user cards"""
+    
     try:
         cursor.execute(
             "SELECT id, name, number, bank, balance, color FROM user_cards WHERE user_id=?",
@@ -1087,7 +1085,7 @@ def get_user_cards(cursor, user_id):
         return []
 
 def get_user_card_by_id(cursor, card_id):
-    """Get specific card by ID."""
+    
     try:
         cursor.execute(
             "SELECT id, name, number, bank, balance, color FROM user_cards WHERE id=?",
@@ -1115,7 +1113,7 @@ def get_user_card_by_id(cursor, card_id):
         return None
 
 def get_total_balance(cursor, user_id):
-    """Get total balance from all user cards."""
+
     try:
         cursor.execute(
             "SELECT SUM(balance) FROM user_cards WHERE user_id=?",
@@ -1129,7 +1127,7 @@ def get_total_balance(cursor, user_id):
         return 0.0
 
 def update_card_balance(cursor, conn, card_id, amount, description=""):
-    """Update card balance by adding amount"""
+
     try:
         cursor.execute("SELECT user_id, name, balance FROM user_cards WHERE id=?", (card_id,))
         card_info = cursor.fetchone()
@@ -1160,7 +1158,7 @@ def update_card_balance(cursor, conn, card_id, amount, description=""):
         return False
 
 def delete_user_card(cursor, conn, card_id):
-    """Delete user card from database."""
+
     try:
         cursor.execute("SELECT user_id, name FROM user_cards WHERE id=?", (card_id,))
         card_info = cursor.fetchone()
@@ -1178,7 +1176,7 @@ def delete_user_card(cursor, conn, card_id):
         return False
 
 def update_user_card(cursor, conn, card_id, name=None, number=None, bank=None, balance=None, color=None):
-    """Update user card information."""
+
     try:
         update_fields = []
         params = []
@@ -1215,7 +1213,7 @@ def update_user_card(cursor, conn, card_id, name=None, number=None, bank=None, b
         return False
 
 def transfer_money_between_cards(cursor, conn, from_card_id, to_card_id, amount):
-    """Transfer money between cards."""
+
     try:
         cursor.execute("SELECT balance, user_id, name FROM user_cards WHERE id=?", (from_card_id,))
         from_result = cursor.fetchone()
@@ -1252,7 +1250,7 @@ def transfer_money_between_cards(cursor, conn, from_card_id, to_card_id, amount)
         return False, "Помилка переказу"
 
 def log_transaction(cursor, conn, user_id, transaction_type, amount, description="", card_id=None):
-    """Логування транзакції з уникненням дублювання"""
+
     try:
         if transaction_type == 'card_creation':
             return True
@@ -1281,7 +1279,7 @@ def log_transaction(cursor, conn, user_id, transaction_type, amount, description
         return False
     
 def update_envelope(cursor, conn, envelope_id, name=None, budget_limit=None):
-    """Update envelope information."""
+
     try:
         update_fields = []
         params = []
@@ -1307,7 +1305,7 @@ def update_envelope(cursor, conn, envelope_id, name=None, budget_limit=None):
         return False
     
 def get_user_transactions(cursor, user_id, limit=50):
-    """Get transaction history for user."""
+
     try:
         cursor.execute('''
             SELECT t.type, t.amount, t.description, t.created_at, c.name as card_name
@@ -1337,7 +1335,7 @@ def get_user_transactions(cursor, user_id, limit=50):
         return []
 
 def log_savings_transaction(cursor, conn, user_id, plan_id, amount, trans_type, description=""):
-    """Log a savings transaction to the database."""
+
     try:
         cursor.execute(
             "INSERT INTO savings_transactions(user_id, plan_id, amount, type, description) VALUES(?, ?, ?, ?, ?)",
@@ -1348,7 +1346,7 @@ def log_savings_transaction(cursor, conn, user_id, plan_id, amount, trans_type, 
         print(f"Error logging savings transaction: {e}")
 
 def create_envelope(cursor, conn, user_id, name, color=None, budget_limit=0.0):
-    """Create a new envelope for user."""
+
     try:
         if color is None:
             color = '[0.2, 0.4, 0.8, 1]'
@@ -1366,7 +1364,7 @@ def create_envelope(cursor, conn, user_id, name, color=None, budget_limit=0.0):
         return None
 
 def get_user_envelopes(cursor, user_id):
-    """Get all envelopes for a user."""
+
     try:
         cursor.execute(
             "SELECT id, name, color, budget_limit, current_amount FROM envelopes WHERE user_id=?",
@@ -1392,7 +1390,7 @@ def get_user_envelopes(cursor, user_id):
         return []
 
 def add_to_envelope(cursor, conn, user_id, envelope_id, amount, description="", card_id=None):
-    """Add money to envelope."""
+ 
     try:
         cursor.execute(
             "UPDATE envelopes SET current_amount = current_amount + ? WHERE id=?",
@@ -1415,7 +1413,7 @@ def add_to_envelope(cursor, conn, user_id, envelope_id, amount, description="", 
         return False
 
 def get_envelope_name(cursor, envelope_id):
-    """Get envelope name by ID."""
+  
     try:
         cursor.execute("SELECT name FROM envelopes WHERE id=?", (envelope_id,))
         result = cursor.fetchone()
@@ -1425,7 +1423,7 @@ def get_envelope_name(cursor, envelope_id):
         return "Unknown"
 
 def get_envelope_transactions(cursor, user_id, envelope_id=None, limit=50):
-    """Get transactions for envelopes."""
+    
     try:
         query = '''
             SELECT et.amount, et.description, et.created_at, e.name as envelope_name, c.name as card_name
@@ -1463,7 +1461,7 @@ def get_envelope_transactions(cursor, user_id, envelope_id=None, limit=50):
         return []
 
 def get_envelope_stats(cursor, user_id):
-    """Get statistics for all envelopes."""
+   
     try:
         cursor.execute('''
             SELECT 
@@ -1498,7 +1496,7 @@ def get_envelope_stats(cursor, user_id):
         return []
 
 def debug_transactions(cursor, user_id):
-    """Функція для відладки транзакцій"""
+ 
     try:
         cursor.execute(
             "SELECT type, amount, description, created_at FROM transactions WHERE user_id=? ORDER BY created_at DESC LIMIT 10",
@@ -1510,7 +1508,7 @@ def debug_transactions(cursor, user_id):
         print(f"Error debugging transactions: {e}")
         return []
 
-# Initialize and export connection objects
+
 conn, cursor = init_database()
 fix_database_schema(conn, cursor)
 
@@ -1526,11 +1524,11 @@ __all__ = [
     'create_envelope', 'get_user_envelopes', 'add_to_envelope', 'get_envelope_transactions', 'get_envelope_stats',
     'update_envelope',
     'create_user', 'get_user_by_email',
-    # Analytics functions
+
     'get_analytics_data', 'get_category_breakdown', 'get_top_categories', 
     'get_cards_analytics', 'get_budget_progress', 'get_insights_and_forecasts', 'get_monthly_comparison',
     'debug_transactions',
-    # New account functions
+  
     'save_profile_photo', 'get_profile_photo',
     'log_user_session', 'log_user_logout', 'get_login_history',
     'get_user_settings', 'update_user_settings',

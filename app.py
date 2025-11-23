@@ -23,5 +23,5 @@ class FinanceApp(App):
         return sm
 
     def on_stop(self):
-        """Закриває з’єднання з БД при завершенні."""
+      
         conn.close()

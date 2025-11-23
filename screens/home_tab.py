@@ -39,7 +39,6 @@ except ImportError:
     def delete_user_card(*args): return True
     def transfer_money_between_cards(*args): return True, ""
 
-# Кольорова палітра
 PRIMARY_PINK = (0.95, 0.3, 0.5, 1)
 PRIMARY_BLUE = (0.2, 0.7, 0.9, 1)
 LIGHT_PINK = (1, 0.95, 0.95, 1)
@@ -51,7 +50,7 @@ DARK_TEXT = (0.1, 0.1, 0.1, 1)
 LIGHT_GRAY = (0.9, 0.9, 0.9, 1)
 DARK_GRAY = (0.4, 0.4, 0.4, 1)
 
-# Шифрування для номерів карток
+
 class CardEncryption:
     def __init__(self):
         self.password = b"flamingo_card_encryption_key_2024"
@@ -84,15 +83,13 @@ class CardEncryption:
             decrypted = self.cipher_suite.decrypt(encrypted_card.encode('utf-8'))
             return decrypted.decode('utf-8')
         except Exception as e:
-            # Якщо не вдається розшифрувати, повертаємо None
             return None
 
-# Глобальний екземпляр шифрувальника
+
 card_encryptor = CardEncryption()
 
 def fix_existing_cards():
     try:
-        # Припускаємо, що таблиця називається 'user_cards' (як у db_manager)
         cursor.execute("SELECT id, number FROM user_cards")
         cards = cursor.fetchall()
         
@@ -103,7 +100,7 @@ def fix_existing_cards():
             is_encrypted = False
             decrypted_value = card_encryptor.decrypt_card_number(card_number)
 
-            # Перевіряємо, чи розшифрований формат схожий на "XXXX XXXX XXXX XXXX"
+
             if decrypted_value and decrypted_value.count(' ') == 3 and len(decrypted_value) == 19:
                 is_encrypted = True
             
@@ -183,7 +180,7 @@ class ModernBankCard(BoxLayout):
             orientation='vertical'
         )
         
-        # ВИПРАВЛЕНО: Використовуємо коректно обчислений masked_number з load_user_cards
+
         masked_number = card_data.get('masked_number', '**** **** **** ****') 
         
         number_label = Label(
@@ -373,9 +370,7 @@ class HomeTab(Screen):
                 self.ids.balance_label.text = "Загальний баланс: 0.00 $"
     
     def load_user_cards(self):
-        """
-        Виправлено: Розшифровує зашифрований номер з db_manager та коректно маскує.
-        """
+
         try:
             app = self.get_app()
             
@@ -387,11 +382,11 @@ class HomeTab(Screen):
                 
                 encrypted_number = card.get('number', '')
                 
-                # Крок 1: Розшифрування номера
+
                 decrypted_number = card_encryptor.decrypt_card_number(encrypted_number)
                 
                 if decrypted_number:
-                    # Крок 2: Очищення та маскування
+            
                     clean_number = decrypted_number.replace(" ", "")
                     if len(clean_number) >= 4 and clean_number.isdigit():
                         last_four = clean_number[-4:]
@@ -399,12 +394,12 @@ class HomeTab(Screen):
                     else:
                         processed_card['masked_number'] = "**** **** **** ****"
                     
-                    processed_card['decrypted_number'] = decrypted_number # Форматований розшифрований (XXXX XXXX...)
+                    processed_card['decrypted_number'] = decrypted_number 
                 else:
                     processed_card['masked_number'] = "**** **** **** ****"
                     processed_card['decrypted_number'] = None
                 
-                # Зберігаємо зашифрований номер на випадок, якщо він потрібен в іншому місці
+
                 processed_card['number'] = encrypted_number 
                 
                 self.cards_data.append(processed_card)

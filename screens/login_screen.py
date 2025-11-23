@@ -4,7 +4,7 @@ from kivy.clock import Clock
 from db_manager import conn, cursor, check_password
 
 class LoginScreen(Screen):
-    """Екран входу користувача."""
+
     
     def login_user(self):
         email = self.ids.email.text.strip()
@@ -19,13 +19,13 @@ class LoginScreen(Screen):
                 
                 app = App.get_running_app()
                 
-                # Зберігаємо дані в ОБОХ місцях для безпеки
+ 
                 app.root.current_user = user[1]
                 app.root.current_user_id = user[0]
                 app.current_user = user[1]
                 app.current_user_id = user[0]
 
-                # Отримуємо баланс
+  
                 cursor.execute("SELECT balance FROM wallets WHERE user_id=?", (user[0],))
                 result = cursor.fetchone()
                 if result:
@@ -33,7 +33,7 @@ class LoginScreen(Screen):
                     app.root.balance = balance
                     app.balance = balance
                 else:
-                    # Якщо гаманця немає (має бути, але для безпеки)
+
                     cursor.execute("INSERT INTO wallets (user_id, balance) VALUES (?, ?)", 
                                  (user[0], 0.0))
                     conn.commit()
@@ -46,7 +46,7 @@ class LoginScreen(Screen):
                 self.manager.transition.direction = 'left'
                 self.manager.current = "dashboard_screen"
                 
-                # Примусово оновлюємо dashboard після входу
+
                 Clock.schedule_once(lambda dt: self.force_dashboard_update(), 0.5)
                 
             else:
@@ -56,7 +56,7 @@ class LoginScreen(Screen):
             print(f"Login error: {e}")
 
     def force_dashboard_update(self):
-        """Force dashboard to update after login."""
+
         dashboard = self.manager.get_screen('dashboard_screen')
         if hasattr(dashboard, 'update_all_tabs'):
             dashboard.update_all_tabs()

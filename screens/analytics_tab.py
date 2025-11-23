@@ -25,7 +25,7 @@ from db_manager import (
     get_monthly_comparison, update_envelope
 )
 
-# Кольори
+
 PRIMARY_PINK = (0.95, 0.3, 0.5, 1)
 PRIMARY_BLUE = (0.2, 0.7, 0.9, 1)
 LIGHT_PINK = (1, 0.95, 0.95, 1)
@@ -33,14 +33,13 @@ LIGHT_BLUE = (0.92, 0.98, 1.0, 1)
 ERROR_RED = (0.9, 0.2, 0.2, 1)
 SUCCESS_GREEN = (0.2, 0.8, 0.3, 1)
 WARNING_ORANGE = (1, 0.6, 0.2, 1)
-SAVINGS_PINK = (0.95, 0.4, 0.6, 1)  # Рожевий для заощаджень
+SAVINGS_PINK = (0.95, 0.4, 0.6, 1) 
 WHITE = (1, 1, 1, 1)
 DARK_TEXT = (0.1, 0.1, 0.1, 1)
 LIGHT_GRAY = (0.9, 0.9, 0.9, 1)
 MEDIUM_GRAY = (0.7, 0.7, 0.7, 1)
 DARK_GRAY = (0.4, 0.4, 0.4, 1)
 
-# Палітра унікальних кольорів для конвертів
 ENVELOPE_COLORS = [
     [0.95, 0.3, 0.5, 1],    # Яскраво рожевий
     [0.2, 0.7, 0.9, 1],     # Блакитний
@@ -61,15 +60,15 @@ ENVELOPE_COLORS = [
 ]
 
 def get_unique_color(envelope_count):
-    """Отримати унікальний колір для конверту"""
+
     return ENVELOPE_COLORS[envelope_count % len(ENVELOPE_COLORS)]
 
-# Білі модальні вікна (аналогічно SavingsTab)
+
 class WhitePopup(Popup):
-    """Базовий клас білого попапу з темним текстом"""
+
     
     def __init__(self, **kwargs):
-        # Видаляємо всі параметри фону, щоб уникнути конфліктів
+
         kwargs.pop('background', '')
         kwargs.pop('background_color', None)
         kwargs.pop('background_normal', None)
@@ -77,36 +76,36 @@ class WhitePopup(Popup):
         
         super().__init__(**kwargs)
         
-        # Робимо фон повністю прозорим
+      
         self.background = ''
         self.background_color = [1, 1, 1, 0]
         self.separator_height = 0
         self.auto_dismiss = False
         
-        # Створюємо білий фон через canvas
+       
         with self.canvas.before:
             Color(*WHITE)
             self.bg_rect = Rectangle(pos=self.pos, size=self.size)
             
-            # Додаємо темну рамку
+           
             Color(*DARK_GRAY)
             self.border_line = Line(
                 rectangle=(self.x, self.y, self.width, self.height),
                 width=1.2
             )
         
-        # Прив'язуємо оновлення позиції та розміру
+        
         self.bind(pos=self._update_graphics, size=self._update_graphics)
     
     def _update_graphics(self, *args):
-        """Оновлюємо графічні елементи при зміні позиції чи розміру"""
+     
         self.bg_rect.pos = self.pos
         self.bg_rect.size = self.size
         self.border_line.rectangle = (self.x, self.y, self.width, self.height)
 
 
 class WhiteButton(Button):
-    """Стилізована кнопка для білих попапів"""
+    
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -119,7 +118,7 @@ class WhiteButton(Button):
         self.height = dp(45)
         self.bold = True
         
-        # Додаємо фон через canvas
+       
         with self.canvas.before:
             Color(*self.background_color)
             self.rect = Rectangle(pos=self.pos, size=self.size)
@@ -139,7 +138,7 @@ class WhiteButton(Button):
 
 
 class WhiteTextInput(TextInput):
-    """Стилізоване текстове поле для білих попапів"""
+    
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -156,7 +155,7 @@ class WhiteTextInput(TextInput):
         self.hint_text_color = LIGHT_GRAY
         self.write_tab = False
         
-        # Додаємо рамку
+
         with self.canvas.after:
             Color(*DARK_GRAY)
             self.border_line = Line(
@@ -171,7 +170,7 @@ class WhiteTextInput(TextInput):
 
 
 class CompactEnvelopeCard(BoxLayout):
-    """Компактна картка конверту з покращеним дизайном"""
+
     def __init__(self, envelope_data, on_manage_callback=None, **kwargs):
         super().__init__(**kwargs)
         self.envelope_data = envelope_data
@@ -182,7 +181,7 @@ class CompactEnvelopeCard(BoxLayout):
         self.padding = dp(12)
         self.spacing = dp(6)
         
-        # Фон картки
+      
         with self.canvas.before:
             Color(*envelope_data['color'])
             self.bg_rect = RoundedRectangle(
@@ -190,8 +189,7 @@ class CompactEnvelopeCard(BoxLayout):
                 size=self.size,
                 radius=[dp(12)]
             )
-            
-            # Градієнтний ефект
+     
             Color(1, 1, 1, 0.2)
             RoundedRectangle(
                 pos=(self.x, self.y + self.height * 0.4),
@@ -201,7 +199,7 @@ class CompactEnvelopeCard(BoxLayout):
         
         self.bind(pos=self.update_graphics, size=self.update_graphics)
         
-        # Назва конверту
+  
         name_label = Label(
             text=envelope_data['name'],
             font_size=dp(14),
@@ -212,7 +210,7 @@ class CompactEnvelopeCard(BoxLayout):
         )
         self.add_widget(name_label)
         
-        # Баланс
+
         balance_label = Label(
             text=f"{envelope_data['current_amount']:.2f} $",
             font_size=dp(18),
@@ -223,7 +221,7 @@ class CompactEnvelopeCard(BoxLayout):
         )
         self.add_widget(balance_label)
         
-        # Прогрес бар для бюджету
+     
         if envelope_data['budget_limit'] > 0:
             self.progress_bg = Widget(size_hint_y=None, height=dp(6))
             with self.progress_bg.canvas:
@@ -234,7 +232,7 @@ class CompactEnvelopeCard(BoxLayout):
                 )
             self.add_widget(self.progress_bg)
             
-            # Відсоток використання бюджету
+           
             percentage = min((envelope_data['current_amount'] / envelope_data['budget_limit']) * 100, 100)
             percent_label = Label(
                 text=f"{percentage:.0f}%",
@@ -245,14 +243,14 @@ class CompactEnvelopeCard(BoxLayout):
             )
             self.add_widget(percent_label)
         
-        # Кнопки дій
+     
         buttons_layout = BoxLayout(
             size_hint_y=None,
             height=dp(28),
             spacing=dp(5)
         )
         
-        # Кнопка поповнення
+     
         add_btn = Button(
             text='+',
             size_hint_x=0.5,
@@ -264,7 +262,7 @@ class CompactEnvelopeCard(BoxLayout):
         add_btn.bind(on_press=self.on_add_money)
         buttons_layout.add_widget(add_btn)
         
-        # Кнопка редагування
+   
         edit_btn = Button(
             text='✎',
             size_hint_x=0.5,
@@ -282,18 +280,18 @@ class CompactEnvelopeCard(BoxLayout):
             self.progress_bg.bind(pos=self._update_progress_bg, size=self._update_progress_bg)
 
     def update_graphics(self, *args):
-        """Оновити графічні елементи при зміні розміру"""
+       
         self.bg_rect.pos = self.pos
         self.bg_rect.size = self.size
 
     def _update_progress_bg(self, instance, value):
-        """Оновити позицію прогрес бару"""
+     
         self.progress_bg_rect.pos = instance.pos
         self.progress_bg_rect.size = instance.size
         self.update_progress_bar()
 
     def update_progress_bar(self):
-        """Оновити відображення прогрес бару"""
+       
         if not hasattr(self, 'progress_bg') or self.envelope_data['budget_limit'] <= 0:
             return
             
@@ -301,7 +299,7 @@ class CompactEnvelopeCard(BoxLayout):
         percentage = min((self.envelope_data['current_amount'] / self.envelope_data['budget_limit']) * 100, 100)
         
         with self.progress_bg.canvas.after:
-            # Колір залежно від відсотка заповнення
+        
             if percentage < 70:
                 Color(*SUCCESS_GREEN)
             elif percentage < 90:
@@ -317,18 +315,18 @@ class CompactEnvelopeCard(BoxLayout):
             )
 
     def on_add_money(self, instance):
-        """Обробка натискання кнопки поповнення"""
+        
         if self.on_manage_callback:
             self.on_manage_callback(self.envelope_data, 'add')
 
     def on_edit(self, instance):
-        """Обробка натискання кнопки редагування"""
+        
         if self.on_manage_callback:
             self.on_manage_callback(self.envelope_data, 'edit')
 
 
 class StatCard(BoxLayout):
-    """Картка статистики з покращеним дизайном"""
+    
     def __init__(self, title, value, subtitle="", color=PRIMARY_BLUE, **kwargs):
         super().__init__(**kwargs)
         self.orientation = 'vertical'
@@ -337,7 +335,7 @@ class StatCard(BoxLayout):
         self.padding = dp(10)
         self.spacing = dp(4)
         
-        # Фон картки
+       
         with self.canvas.before:
             Color(*color)
             self.bg_rect = RoundedRectangle(
@@ -348,7 +346,7 @@ class StatCard(BoxLayout):
         
         self.bind(pos=self._update, size=self._update)
         
-        # Заголовок
+      
         self.title_label = Label(
             text=title,
             font_size=dp(12),
@@ -359,7 +357,7 @@ class StatCard(BoxLayout):
         )
         self.add_widget(self.title_label)
         
-        # Значення
+     
         self.value_label = Label(
             text=str(value),
             font_size=dp(16),
@@ -370,7 +368,7 @@ class StatCard(BoxLayout):
         )
         self.add_widget(self.value_label)
         
-        # Підзаголовок
+     
         self.subtitle_label = Label(
             text=subtitle,
             font_size=dp(10),
@@ -381,18 +379,18 @@ class StatCard(BoxLayout):
         self.add_widget(self.subtitle_label)
     
     def update_data(self, value, subtitle=""):
-        """Оновити дані картки"""
+       
         self.value_label.text = str(value)
         self.subtitle_label.text = subtitle
     
     def _update(self, *args):
-        """Оновити графіку при зміні розміру"""
+      
         self.bg_rect.pos = self.pos
         self.bg_rect.size = self.size
 
 
 class SimplePieChartWidget(Widget):
-    """Інтерактивна кругова діаграма з легендами при наведенні/дотику."""
+    
     def __init__(self, data=None, **kwargs):
         super().__init__(**kwargs)
         self.data = data or []
@@ -409,12 +407,12 @@ class SimplePieChartWidget(Widget):
         self.bind(pos=self.update_chart, size=self.update_chart)
     
     def update_data(self, data):
-        """Оновити дані діаграми"""
+        
         self.data = data
         self.update_chart()
     
     def update_chart(self, *args):
-        """Оновити відображення діаграми"""
+       
         self.canvas.clear()
         for child in self.children[:]:
             self.remove_widget(child)
@@ -432,11 +430,11 @@ class SimplePieChartWidget(Widget):
         self.center_y = self.height / 2
         self.radius = min(self.width, self.height) * 0.35
         
-        # В Kivy: angle_start=0 = 3 година, збільшення = проти годинникової стрілки
+        
         start_angle = 0
         self.sectors = []
         
-        # Обходимо і малюємо сектори
+       
         for i, item in enumerate(self.data):
             percentage = item['amount'] / total
             angle = percentage * 360
@@ -445,7 +443,7 @@ class SimplePieChartWidget(Widget):
             
             self.draw_filled_sector(self.center_x, self.center_y, self.radius, start_angle, end_angle, item['color'])
             
-            # Зберігаємо дані сектора
+            
             self.sectors.append({
                 'item': item,
                 'percentage': percentage,
@@ -459,7 +457,7 @@ class SimplePieChartWidget(Widget):
         self.add_hint()
 
     def draw_filled_sector(self, cx, cy, radius, start_angle, end_angle, color):
-        """Малює заповнений сектор кругової діаграми"""
+    
         with self.canvas:
             Color(*color)
             Ellipse(
@@ -470,15 +468,15 @@ class SimplePieChartWidget(Widget):
             )
 
     def on_touch_move(self, touch):
-        """Обробка руху курсора/дотику для відображення легенди"""
+    
         return self.handle_touch(touch)
 
     def on_touch_down(self, touch):
-        """Обробка натискання для відображення легенди"""
+   
         return self.handle_touch(touch)
 
     def handle_touch(self, touch):
-        """Обробка дотику"""
+  
         if not self.collide_point(*touch.pos):
             self.hide_legend()
             self.hovered_sector = None
@@ -496,9 +494,7 @@ class SimplePieChartWidget(Widget):
         return True
 
     def get_sector_at_pos(self, x, y):
-        """
-        ВИПРАВЛЕНА ЛОГІКА: Правильне визначення сектора з урахуванням системи Kivy
-        """
+
         dx = x - self.center_x
         dy = y - self.center_y
         distance = math.sqrt(dx*dx + dy*dy)
@@ -506,64 +502,59 @@ class SimplePieChartWidget(Widget):
         if distance > self.radius or distance == 0:
             return None
         
-        # Обчислюємо кут у радіанах
+
         angle_rad = math.atan2(dy, dx)
         
-        # Конвертуємо в систему Kivy:
-        # - 0° = праворуч (3 година)
-        # - Збільшення проти годинникової стрілки
-        # - angle_rad: 0 = праворуч, π/2 = вгору, π = ліворуч, -π/2 = вниз
+
         angle_deg = math.degrees(angle_rad)
         
-        # Конвертуємо в систему Kivy (0° = праворуч, збільшення проти годинникової)
+
         angle_kivy = (90 - angle_deg) % 360
         if angle_kivy < 0:
             angle_kivy += 360
         
-        # print(f"Курсор: ({x:.1f}, {y:.1f}), Кут Kivy: {angle_kivy:.1f}°")
+
         
-        # Шукаємо сектор, що містить цей кут
         for i, sector in enumerate(self.sectors):
             start = sector['start_angle']
             end = sector['end_angle']
             
-            # print(f"Сектор {i}: {sector['item']['name']}, Кут: {start:.1f}° - {end:.1f}°")
+
             
-            # Для нормальних секторів (start < end)
+
             if start <= end:
                 if start <= angle_kivy <= end:
-                    # print(f"✓ Знайдено сектор: {sector['item']['name']}")
+        
                     return sector
             else:
-                # Для секторів, що переходять через 360°
+    
                 if angle_kivy >= start or angle_kivy <= end:
-                    # print(f"✓ Знайдено сектор (через 360°): {sector['item']['name']}")
+        
                     return sector
         
-        # print("✗ Сектор не знайдено")
+
         return None
 
     def show_legend(self, sector, x, y):
-        """Показати легенду для сектора"""
+ 
         self.hide_legend()
         
         item = sector['item']
         percentage = sector['percentage']
         
-        # print(f"=== ПОКАЗУЄМО ЛЕГЕНДУ ДЛЯ: {item['name']} ===")
+
         
-        # Створюємо контент легенди
+
         legend_content = f"{item['name']}\n${item['amount']:.2f}\n({percentage * 100:.1f}%)"
         
-        # Розміри легенди
+
         text_width = dp(120)
         text_height = dp(65)
-        
-        # Визначаємо позицію для легенди
+
         pos_x = x + dp(15)
         pos_y = y + dp(15)
         
-        # Коректуємо позицію, якщо виходить за межі
+
         if pos_x + text_width > self.width - dp(5):
             pos_x = x - text_width - dp(15)
         if pos_y + text_height > self.height - dp(5):
@@ -572,7 +563,7 @@ class SimplePieChartWidget(Widget):
         pos_x = max(dp(5), min(pos_x, self.width - text_width - dp(5)))
         pos_y = max(dp(5), min(pos_y, self.height - text_height - dp(5)))
 
-        # Створюємо легенду
+
         self.current_legend = BoxLayout(
             orientation='vertical',
             size=(text_width, text_height),
@@ -581,7 +572,7 @@ class SimplePieChartWidget(Widget):
             spacing=dp(3)
         )
         
-        # Фон легенди
+
         with self.current_legend.canvas.before:
             Color(1, 1, 1, 0.98)
             RoundedRectangle(
@@ -599,13 +590,13 @@ class SimplePieChartWidget(Widget):
                 width=dp(1.5)
             )
         
-        # Колірний індикатор
+
         color_indicator = Widget(size_hint_y=None, height=dp(4))
         with color_indicator.canvas:
             Color(*sector['color'])
             Rectangle(pos=color_indicator.pos, size=color_indicator.size)
         
-        # Текст легенди
+  
         legend_label = Label(
             text=legend_content,
             font_size=dp(11),
@@ -620,18 +611,18 @@ class SimplePieChartWidget(Widget):
         self.add_widget(self.current_legend)
 
     def hide_legend(self):
-        """Приховати поточну легенду"""
+
         if self.current_legend:
             self.remove_widget(self.current_legend)
             self.current_legend = None
 
     def add_hint(self):
-        """Додати підказку про те, як користуватися діаграмою"""
+
         if not self.data:
             return
             
         hint_label = Label(
-            text="👆 Наведіть на сектор для деталей",
+            text="Наведіть на сектор для деталей",
             pos=(dp(10), dp(5)),
             size=(self.width - dp(20), dp(20)),
             size_hint=(None, None),
@@ -642,7 +633,7 @@ class SimplePieChartWidget(Widget):
         self.add_widget(hint_label)
 
     def show_no_data(self):
-        """Показати повідомлення про відсутність даних"""
+   
         center_x = self.width / 2
         center_y = self.height / 2
         
@@ -666,9 +657,7 @@ class SimplePieChartWidget(Widget):
 
 
 class AnalyticsTab(Screen):
-    """Вкладка аналітики з покращеним UI"""
-    
-    # Властивості для KV файлу
+
     primary_pink = ListProperty(PRIMARY_PINK)
     primary_blue = ListProperty(PRIMARY_BLUE)
     light_pink = ListProperty(LIGHT_PINK)
@@ -692,38 +681,38 @@ class AnalyticsTab(Screen):
         Clock.schedule_once(self.create_ui, 0.1)
     
     def get_app(self):
-        """Отримати поточний додаток"""
+
         return App.get_running_app()
     
     def create_ui(self, dt=None):
-        """Створення інтерфейсу"""
+
         self.load_data()
     
     def on_enter(self):
-        """Оновити дані при вході на вкладку"""
+
         Clock.schedule_once(lambda dt: self.load_data(), 0.1)
     
     def load_data(self):
-        """Завантажити всі необхідні дані"""
+ 
         try:
             app = self.get_app()
             if not hasattr(app, 'current_user_id') or not app.current_user_id:
                 return
             
-            # Завантажити карти користувача
+
             self.user_cards = get_user_cards(cursor, app.current_user_id)
             
-            # Завантажити конверти
+      
             self.envelopes_data = get_user_envelopes(cursor, app.current_user_id)
             
-            # Створити дефолтні конверти, якщо їх немає
+     
             if not self.envelopes_data:
                 self.create_default_envelopes()
             else:
-                # Завантажити аналітичні дані
+           
                 self.load_analytics_data()
                 
-                # Оновити інтерфейс
+      
                 self.update_envelopes_display()
                 self.update_stats_display()
                 self.update_charts_display()
@@ -732,7 +721,7 @@ class AnalyticsTab(Screen):
             print(f"Помилка завантаження даних аналітики: {e}")
     
     def create_default_envelopes(self):
-        """Створити стандартні конверти"""
+     
         try:
             app = self.get_app()
             
@@ -751,10 +740,10 @@ class AnalyticsTab(Screen):
                     app.current_user_id, 
                     envelope["name"], 
                     envelope["color"], 
-                    0.0  # Без бюджету
+                    0.0  
                 )
             
-            # Перезавантажити дані
+
             self.envelopes_data = get_user_envelopes(cursor, app.current_user_id)
             self.load_analytics_data()
             self.update_envelopes_display()
@@ -765,24 +754,24 @@ class AnalyticsTab(Screen):
             print(f"Помилка створення стандартних конвертів: {e}")
     
     def load_analytics_data(self):
-        """Завантажити дані для аналітики"""
+    
         try:
             app = self.get_app()
             
-            # Основна аналітика
+
             self.analytics_data = get_analytics_data(cursor, app.current_user_id, 'month')
             print(f"Завантажена аналітика: {self.analytics_data}")
             
-            # Дані про заощадження
+
             savings_data = self.get_savings_data(app.current_user_id)
             
-            # Додати заощадження до аналітики
+        
             if savings_data:
                 self.analytics_data['total_savings'] = savings_data['total_savings']
                 self.analytics_data['savings_progress'] = savings_data['savings_progress']
                 self.analytics_data['active_savings_plans'] = savings_data['active_plans_count']
             
-            # Підготувати дані для кругової діаграми
+
             self.envelopes_for_chart = []
             for envelope in self.envelopes_data:
                 if envelope['current_amount'] > 0:
@@ -792,12 +781,12 @@ class AnalyticsTab(Screen):
                         'color': envelope['color']
                     })
             
-            # Додати заощадження до діаграми
+     
             if savings_data and savings_data['total_savings'] > 0:
                 self.envelopes_for_chart.append({
                     'name': 'Заощадження',
                     'amount': savings_data['total_savings'],
-                    'color': SAVINGS_PINK  # Рожевий для заощаджень
+                    'color': SAVINGS_PINK  
                 })
             
         except Exception as e:
@@ -806,7 +795,7 @@ class AnalyticsTab(Screen):
             self.envelopes_for_chart = []
 
     def get_savings_data(self, user_id):
-        """Отримати дані про заощадження"""
+
         try:
             cursor.execute('''
                 SELECT 
@@ -836,7 +825,7 @@ class AnalyticsTab(Screen):
             return None
     
     def update_envelopes_display(self):
-        """Оновити відображення конвертів"""
+ 
         if 'envelopes_container' not in self.ids:
             return
             
@@ -855,7 +844,7 @@ class AnalyticsTab(Screen):
             container.add_widget(envelope_card)
     
     def update_stats_display(self):
-        """Оновити відображення статистики"""
+    
         if 'stats_container' not in self.ids:
             return
             
@@ -874,7 +863,7 @@ class AnalyticsTab(Screen):
             container.add_widget(no_data_label)
             return
         
-        # Статистичні картки
+
         stats_cards = [
             {
                 'title': 'Доходи',
@@ -912,18 +901,18 @@ class AnalyticsTab(Screen):
             container.add_widget(stat_card)
     
     def update_charts_display(self):
-        """Оновити відображення кругової діаграми"""
+   
         if 'charts_container' not in self.ids:
             return
             
         container = self.ids.charts_container
         container.clear_widgets()
         
-        # Основний контейнер для діаграми
+  
         charts_main_layout = BoxLayout(orientation='vertical', spacing=dp(5), size_hint_y=None, height=dp(350))
         
         if hasattr(self, 'envelopes_for_chart') and self.envelopes_for_chart:
-            # Заголовок діаграми
+  
             vis_label = Label(
                 text="Візуалізація",
                 font_size=dp(18),
@@ -944,7 +933,7 @@ class AnalyticsTab(Screen):
             )
             charts_main_layout.add_widget(title_label)
             
-            # Кругова діаграма
+     
             pie_chart = SimplePieChartWidget(self.envelopes_for_chart)
             pie_chart.size_hint_y = 1
             charts_main_layout.add_widget(pie_chart)
@@ -961,17 +950,17 @@ class AnalyticsTab(Screen):
         container.add_widget(charts_main_layout)
 
     def on_envelope_action(self, envelope_data, action):
-        """Обробка дій з конвертом"""
+    
         if action == 'add':
             self.show_add_money_modal(envelope_data)
         elif action == 'edit':
             self.show_edit_envelope_modal(envelope_data)
     
     def show_edit_envelope_modal(self, envelope_data):
-        """Показати модальне вікно редагування конверту з можливістю видалення (білий дизайн)"""
+      
         content = BoxLayout(orientation='vertical', spacing=dp(15), padding=dp(25))
         
-        # Додаємо білий фон для контенту
+        
         with content.canvas.before:
             Color(*WHITE)
             self.content_rect = Rectangle(pos=content.pos, size=content.size)
@@ -988,7 +977,7 @@ class AnalyticsTab(Screen):
         )
         content.add_widget(title)
         
-        # Назва конверту
+      
         name_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(45))
         name_layout.add_widget(Label(
             text='Назва:', 
@@ -1003,7 +992,7 @@ class AnalyticsTab(Screen):
         name_layout.add_widget(name_input)
         content.add_widget(name_layout)
         
-        # Бюджет
+       
         budget_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(45))
         budget_layout.add_widget(Label(
             text='Бюджет:', 
@@ -1028,7 +1017,7 @@ class AnalyticsTab(Screen):
         )
         content.add_widget(error_label)
         
-        # Кнопки
+        
         buttons_layout = BoxLayout(
             orientation='horizontal', 
             spacing=dp(10), 
@@ -1063,7 +1052,7 @@ class AnalyticsTab(Screen):
             try:
                 new_budget = float(budget_text) if budget_text else 0.0
                 
-                # Оновлюємо конверт в базі даних
+          
                 success = update_envelope(
                     cursor, conn,
                     envelope_data['id'],
@@ -1082,7 +1071,7 @@ class AnalyticsTab(Screen):
                 error_label.text = "Введіть коректну суму бюджету"
         
         def delete_envelope(instance):
-            """Видалити конверт"""
+        
             confirm_content = BoxLayout(orientation='vertical', spacing=dp(15), padding=dp(25))
             
             with confirm_content.canvas.before:
@@ -1117,7 +1106,7 @@ class AnalyticsTab(Screen):
             
             def confirm_delete(instance):
                 try:
-                    # Видаляємо конверт з бази даних
+                 
                     cursor.execute("DELETE FROM envelopes WHERE id=?", (envelope_data['id'],))
                     cursor.execute("DELETE FROM envelope_transactions WHERE envelope_id=?", (envelope_data['id'],))
                     conn.commit()
@@ -1161,17 +1150,17 @@ class AnalyticsTab(Screen):
         popup.open()
     
     def _update_content_rect(self, instance, value):
-        """Оновлюємо фон контенту"""
+       
         self.content_rect.pos = instance.pos
         self.content_rect.size = instance.size
     
     def _update_confirm_rect(self, instance, value):
-        """Оновлюємо фон підтвердження"""
+        
         self.confirm_rect.pos = instance.pos
         self.confirm_rect.size = instance.size
     
     def create_envelope(self):
-        """Створити новий конверт з унікальним кольором"""
+     
         try:
             name_input = self.ids.envelope_name_input
             budget_input = self.ids.envelope_budget_input
@@ -1187,7 +1176,7 @@ class AnalyticsTab(Screen):
             
             budget = float(budget_text) if budget_text else 0.0
             
-            # Отримуємо унікальний колір для нового конверту
+          
             color = get_unique_color(len(self.envelopes_data))
             
             app = self.get_app()
@@ -1198,7 +1187,7 @@ class AnalyticsTab(Screen):
                 message_label.color = SUCCESS_GREEN
                 name_input.text = ""
                 budget_input.text = ""
-                # Миттєве оновлення
+             
                 self.load_data()
             else:
                 message_label.text = "Помилка створення конверту"
@@ -1213,10 +1202,10 @@ class AnalyticsTab(Screen):
             self.ids.analytics_message.color = ERROR_RED
     
     def show_add_money_modal(self, envelope_data):
-        """Показати модальне вікно поповнення конверту (білий дизайн)"""
+       
         content = BoxLayout(orientation='vertical', spacing=dp(15), padding=dp(25))
         
-        # Додаємо білий фон для контенту
+    
         with content.canvas.before:
             Color(*WHITE)
             self.content_rect = Rectangle(pos=content.pos, size=content.size)
@@ -1233,7 +1222,7 @@ class AnalyticsTab(Screen):
         )
         content.add_widget(title)
         
-        # Вибір картки
+       
         card_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(45))
         card_layout.add_widget(Label(
             text="З картки:", 
@@ -1252,7 +1241,7 @@ class AnalyticsTab(Screen):
         card_layout.add_widget(card_spinner)
         content.add_widget(card_layout)
         
-        # Сума поповнення
+    
         amount_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(45))
         amount_layout.add_widget(Label(
             text="Сума:", 
@@ -1267,8 +1256,7 @@ class AnalyticsTab(Screen):
         )
         amount_layout.add_widget(amount_input)
         content.add_widget(amount_layout)
-        
-        # Опис
+       
         desc_layout = BoxLayout(orientation='horizontal', size_hint_y=None, height=dp(45))
         desc_layout.add_widget(Label(
             text="Опис:", 
@@ -1324,7 +1312,7 @@ class AnalyticsTab(Screen):
                     error_label.text = "Сума має бути додатною"
                     return
                 
-                # Знаходимо ID картки
+      
                 card_id = None
                 for card in self.user_cards:
                     if card['name'] == card_name:
@@ -1335,7 +1323,7 @@ class AnalyticsTab(Screen):
                     error_label.text = "Картку не знайдено"
                     return
                 
-                # Перевіряємо баланс картки
+      
                 selected_card = next((card for card in self.user_cards if card['id'] == card_id), None)
                 if selected_card and selected_card['balance'] < amount:
                     error_label.text = f"Недостатньо коштів. Доступно: {selected_card['balance']:.2f} $"
@@ -1370,13 +1358,13 @@ class AnalyticsTab(Screen):
         try:
             app = self.get_app()
             
-            # Знімаємо гроші з картки
+          
             cursor.execute(
                 "UPDATE user_cards SET balance = balance - ? WHERE id = ?",
                 (amount, card_id)
             )
             
-            # Додаємо гроші до конверту
+     
             success = add_to_envelope(cursor, conn, app.current_user_id, envelope_id, amount, description, card_id)
             
             conn.commit()
@@ -1390,7 +1378,7 @@ class AnalyticsTab(Screen):
         """Показати повідомлення про успіх (білий дизайн)"""
         content = BoxLayout(orientation='vertical', spacing=dp(15), padding=dp(25))
         
-        # Додаємо білий фон для контенту
+     
         with content.canvas.before:
             Color(*WHITE)
             self.content_rect = Rectangle(pos=content.pos, size=content.size)
