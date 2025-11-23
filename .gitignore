@@ -1,0 +1,41 @@
+# Virtual environment
+venv/
+ENV/
+env/
+
+# Buildozer artifacts
+.buildozer/
+bin/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Build outputs
+*.apk
+*.aab
+*.zip
+*.spec
+
+# Logs and exports
+*.log
+user_exports/
+
+# Database files (якщо не хочеш комітити users.db)
+users.db
+
+# Env keys
+key.env
+.env
+*.env
+
+# Kivy cache
+*.kv.tmp
+.kivy/
+.cache/
+
+# Python build directories
+build/
+dist/
+*.egg-info/
+__pycache__/
